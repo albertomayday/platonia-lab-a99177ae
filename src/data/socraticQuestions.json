@@ -1,0 +1,58 @@
+{
+  "questions": [
+    {
+      "id": "q1",
+      "text": "¿Por qué asumes que el consenso implica verdad?",
+      "axis": "epistemologia",
+      "level": 1,
+      "tension": "verdad-legitimidad",
+      "state": "active",
+      "relatedNodes": ["verdad", "legitimidad"]
+    },
+    {
+      "id": "q2",
+      "text": "Si el miedo te protege, ¿de qué te priva?",
+      "axis": "control",
+      "level": 2,
+      "tension": "miedo-libertad",
+      "state": "active",
+      "relatedNodes": ["miedo", "silencio"]
+    },
+    {
+      "id": "q3",
+      "text": "¿Quién decide qué silencio es prudencia y cuál es cobardía?",
+      "axis": "resistencia",
+      "level": 3,
+      "tension": "silencio-accion",
+      "state": "latent",
+      "relatedNodes": ["silencio", "legitimidad"]
+    },
+    {
+      "id": "q4",
+      "text": "¿Puede una máquina formular la pregunta que no quieres escuchar?",
+      "axis": "tecnica",
+      "level": 2,
+      "tension": "automatismo-critica",
+      "state": "active",
+      "relatedNodes": ["automatismo", "critica"]
+    },
+    {
+      "id": "q5",
+      "text": "Si delegas el pensamiento, ¿sigues siendo responsable de sus conclusiones?",
+      "axis": "etica",
+      "level": 3,
+      "tension": "automatismo-responsabilidad",
+      "state": "active",
+      "relatedNodes": ["automatismo", "verdad"]
+    },
+    {
+      "id": "q6",
+      "text": "¿La narrativa dominante es dominante porque es verdadera, o verdadera porque es dominante?",
+      "axis": "poder",
+      "level": 2,
+      "tension": "narrativa-verdad",
+      "state": "saturated",
+      "relatedNodes": ["narrativa", "verdad", "legitimidad"]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "id": "miedo",
+      "label": "Miedo",
+      "axis": "control",
+      "x": 400,
+      "y": 200,
+      "state": "active",
+      "description": "El miedo como mecanismo de control social y límite del pensamiento libre"
+    },
+    {
+      "id": "legitimidad",
+      "label": "Legitimidad",
+      "axis": "poder",
+      "x": 250,
+      "y": 350,
+      "state": "active",
+      "description": "La construcción narrativa del poder legítimo y sus contradicciones"
+    },
+    {
+      "id": "silencio",
+      "label": "Silencio",
+      "axis": "resistencia",
+      "x": 550,
+      "y": 320,
+      "state": "latent",
+      "description": "El silencio como forma de resistencia y como complicidad"
+    },
+    {
+      "id": "verdad",
+      "label": "Verdad",
+      "axis": "epistemologia",
+      "x": 400,
+      "y": 480,
+      "state": "active",
+      "description": "La verdad como construcción dialéctica, no como revelación"
+    },
+    {
+      "id": "automatismo",
+      "label": "Automatismo",
+      "axis": "tecnica",
+      "x": 180,
+      "y": 200,
+      "state": "latent",
+      "description": "La delegación del pensamiento en sistemas automáticos"
+    },
+    {
+      "id": "critica",
+      "label": "Crítica",
+      "axis": "metodo",
+      "x": 620,
+      "y": 180,
+      "state": "active",
+      "description": "El método socrático como arma de desestabilización conceptual"
+    },
+    {
+      "id": "narrativa",
+      "label": "Narrativa",
+      "axis": "poder",
+      "x": 300,
+      "y": 120,
+      "state": "saturated",
+      "description": "El control de la historia como control del presente"
+    },
+    {
+      "id": "tension",
+      "label": "Tensión",
+      "axis": "dialectica",
+      "x": 500,
+      "y": 420,
+      "state": "active",
+      "description": "La productividad del conflicto no resuelto"
+    }
+  ],
+  "edges": [
+    { "source": "miedo", "target": "legitimidad", "weight": 0.8 },
+    { "source": "miedo", "target": "silencio", "weight": 0.6 },
+    { "source": "legitimidad", "target": "verdad", "weight": 0.7 },
+    { "source": "silencio", "target": "verdad", "weight": 0.5 },
+    { "source": "automatismo", "target": "miedo", "weight": 0.4 },
+    { "source": "critica", "target": "miedo", "weight": 0.9 },
+    { "source": "narrativa", "target": "legitimidad", "weight": 0.85 },
+    { "source": "narrativa", "target": "miedo", "weight": 0.6 },
+    { "source": "tension", "target": "verdad", "weight": 0.75 },
+    { "source": "tension", "target": "silencio", "weight": 0.5 },
+    { "source": "critica", "target": "tension", "weight": 0.7 },
+    { "source": "automatismo", "target": "narrativa", "weight": 0.45 }
+  ]
+}
