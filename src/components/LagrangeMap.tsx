@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import nodesData from '@/data/nodes.json';
 
 interface Node {
@@ -24,6 +24,8 @@ interface LagrangeMapProps {
 const LagrangeMap = ({ onNodeSelect }: LagrangeMapProps) => {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [externalSvgLoaded, setExternalSvgLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const nodes: Node[] = nodesData.nodes as Node[];
   const edges: Edge[] = nodesData.edges;
@@ -55,6 +57,126 @@ const LagrangeMap = ({ onNodeSelect }: LagrangeMapProps) => {
     return node ? { x: node.x, y: node.y } : { x: 0, y: 0 };
   };
 
+  useEffect(() => {
+    // Try to load semantic SVG from public/svg/map.svg and bind interactions
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await fetch('/svg/map.svg');
+        if (!res.ok) throw new Error('No SVG');
+        const text = await res.text();
+        if (!mounted) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'image/svg+xml');
+        const svg = doc.querySelector('svg');
+        if (!svg || !containerRef.current) return;
+
+        // Clear container and append imported SVG
+        containerRef.current.innerHTML = '';
+        const imported = document.importNode(svg, true) as SVGSVGElement;
+        imported.setAttribute('class', 'w-full h-full');
+        imported.setAttribute('role', 'img');
+        containerRef.current.appendChild(imported);
+
+        // Bind node interactions
+        nodes.forEach((n) => {
+          const el = imported.querySelector(`[data-node-id="${n.id}"]`);
+          if (!el) return;
+          el.setAttribute('tabindex', '0');
+          const circle = el.querySelector('circle');
+          const applyStyle = (isHovered: boolean, isSelected: boolean) => {
+            const color = getNodeColor(n.state, isHovered, isSelected);
+            if (circle instanceof SVGElement) circle.setAttribute('fill', color);
+            if (isHovered || isSelected) el.setAttribute('filter', 'url(#glow)');
+            else el.removeAttribute('filter');
+          };
+
+          const onEnter = () => {
+            setHoveredNode(n.id);
+            applyStyle(true, selectedNode === n.id);
+          };
+          const onLeave = () => {
+            setHoveredNode((v) => (v === n.id ? null : v));
+            applyStyle(false, selectedNode === n.id);
+          };
+          const onClick = () => {
+            setSelectedNode((prev) => (prev === n.id ? null : n.id));
+            onNodeSelect?.(n);
+          };
+
+          el.addEventListener('mouseenter', onEnter);
+          el.addEventListener('mouseleave', onLeave);
+          el.addEventListener('click', onClick);
+          el.addEventListener('focus', onEnter);
+          el.addEventListener('blur', onLeave);
+
+          // store cleanup on element
+          (el as any).__cleanup = () => {
+            el.removeEventListener('mouseenter', onEnter);
+            el.removeEventListener('mouseleave', onLeave);
+            el.removeEventListener('click', onClick);
+            el.removeEventListener('focus', onEnter);
+            el.removeEventListener('blur', onLeave);
+          };
+        });
+
+        // Store reference to update edges when hover/selection changes
+        setExternalSvgLoaded(true);
+      } catch (e) {
+        // ignore, fallback to inline svg
+        setExternalSvgLoaded(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+      // cleanup event listeners if svg was injected
+      if (containerRef.current) {
+        const svgel = containerRef.current.querySelector('svg');
+        if (svgel) {
+          const nodesEls = svgel.querySelectorAll('[data-node-id]');
+          nodesEls.forEach((el) => {
+            const c = (el as any).__cleanup;
+            if (typeof c === 'function') c();
+          });
+        }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update external svg visuals when hovered/selected changes
+  useEffect(() => {
+    if (!externalSvgLoaded || !containerRef.current) return;
+    const svgel = containerRef.current.querySelector('svg');
+    if (!svgel) return;
+
+    // Update node fills and edge opacities
+    nodes.forEach((n) => {
+      const el = svgel.querySelector(`[data-node-id="${n.id}"]`);
+      if (!el) return;
+      const circle = el.querySelector('circle');
+      const isHovered = hoveredNode === n.id;
+      const isSelected = selectedNode === n.id;
+      const color = getNodeColor(n.state, isHovered, isSelected);
+      if (circle instanceof SVGElement) circle.setAttribute('fill', color);
+      if (isHovered || isSelected) el.setAttribute('filter', 'url(#glow)');
+      else el.removeAttribute('filter');
+    });
+
+    const edgeEls = svgel.querySelectorAll('[data-edge-source][data-edge-target]');
+    edgeEls.forEach((edgeEl) => {
+      const src = edgeEl.getAttribute('data-edge-source');
+      const tgt = edgeEl.getAttribute('data-edge-target');
+      const opacity = (hoveredNode === src || hoveredNode === tgt) ? '0.8' : (selectedNode === src || selectedNode === tgt ? '0.6' : '0.15');
+      (edgeEl as SVGElement).setAttribute('opacity', opacity);
+      if (hoveredNode === src || hoveredNode === tgt) (edgeEl as SVGElement).removeAttribute('stroke-dasharray');
+      else (edgeEl as SVGElement).setAttribute('stroke-dasharray', '4 4');
+    });
+  }, [hoveredNode, selectedNode, externalSvgLoaded]);
+
   return (
     <div className="relative w-full h-full min-h-[500px] bg-background rounded-lg overflow-hidden">
       {/* Background glow effect */}
@@ -65,131 +187,8 @@ const LagrangeMap = ({ onNodeSelect }: LagrangeMapProps) => {
         }}
       />
       
-      <svg 
-        viewBox="0 0 800 600" 
-        className="w-full h-full"
-        style={{ minHeight: '500px' }}
-      >
-        <defs>
-          {/* Glow filter for nodes */}
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          
-          {/* Gradient for edges */}
-          <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(38, 70%, 50%)" stopOpacity="0.3"/>
-            <stop offset="50%" stopColor="hsl(38, 70%, 50%)" stopOpacity="0.6"/>
-            <stop offset="100%" stopColor="hsl(38, 70%, 50%)" stopOpacity="0.3"/>
-          </linearGradient>
-        </defs>
-
-        {/* Edges */}
-        <g className="edges">
-          {edges.map((edge, i) => {
-            const source = getNodePosition(edge.source);
-            const target = getNodePosition(edge.target);
-            return (
-              <line
-                key={i}
-                x1={source.x}
-                y1={source.y}
-                x2={target.x}
-                y2={target.y}
-                stroke="hsl(38, 50%, 40%)"
-                strokeWidth={edge.weight * 2}
-                opacity={getEdgeOpacity(edge)}
-                className="transition-opacity duration-300"
-                strokeDasharray={hoveredNode === edge.source || hoveredNode === edge.target ? "none" : "4 4"}
-              />
-            );
-          })}
-        </g>
-
-        {/* Nodes */}
-        <g className="nodes">
-          {nodes.map((node) => {
-            const isHovered = hoveredNode === node.id;
-            const isSelected = selectedNode === node.id;
-            const nodeColor = getNodeColor(node.state, isHovered, isSelected);
-            
-            return (
-              <g
-                key={node.id}
-                transform={`translate(${node.x}, ${node.y})`}
-                onMouseEnter={() => setHoveredNode(node.id)}
-                onMouseLeave={() => setHoveredNode(null)}
-                onClick={() => handleNodeClick(node)}
-                className="cursor-pointer"
-              >
-                {/* Outer glow ring */}
-                <circle
-                  r={isHovered || isSelected ? 35 : 28}
-                  fill="none"
-                  stroke={nodeColor}
-                  strokeWidth="1"
-                  opacity={isHovered || isSelected ? 0.5 : 0.2}
-                  className="transition-all duration-300"
-                />
-                
-                {/* Pulsing background for active nodes */}
-                {node.state === 'active' && (
-                  <circle
-                    r="25"
-                    fill={nodeColor}
-                    opacity="0.15"
-                    className="animate-pulse-slow"
-                  />
-                )}
-                
-                {/* Main node circle */}
-                <circle
-                  r={isHovered || isSelected ? 18 : 14}
-                  fill={nodeColor}
-                  filter={isHovered || isSelected ? "url(#glow)" : undefined}
-                  className="transition-all duration-300"
-                />
-                
-                {/* Inner highlight */}
-                <circle
-                  r="6"
-                  fill="hsl(0, 0%, 95%)"
-                  opacity={isHovered || isSelected ? 0.3 : 0.15}
-                  className="transition-opacity duration-300"
-                />
-                
-                {/* Label */}
-                <text
-                  y={isHovered || isSelected ? 45 : 40}
-                  textAnchor="middle"
-                  className="font-philosophy text-sm fill-foreground pointer-events-none select-none"
-                  style={{ 
-                    fontSize: isHovered || isSelected ? '14px' : '12px',
-                    fontWeight: isHovered || isSelected ? 600 : 400,
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {node.label}
-                </text>
-                
-                {/* Axis indicator */}
-                <text
-                  y={isHovered || isSelected ? 60 : 55}
-                  textAnchor="middle"
-                  className="font-system text-xs fill-muted-foreground pointer-events-none select-none"
-                  style={{ fontSize: '9px' }}
-                >
-                  [{node.axis}]
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+      {/* External semantic SVG will be injected here when present */}
+      <div ref={containerRef} className="w-full h-full" />
 
       {/* Selected node detail panel */}
       {selectedNode && (

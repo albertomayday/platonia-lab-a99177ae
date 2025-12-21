@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Navigation from '@/components/Navigation';
+import LabDemo from '@/components/LabDemo';
 import { Beaker, Lock, Sparkles, AlertTriangle } from 'lucide-react';
 
 const Laboratorio = () => {
@@ -72,24 +73,7 @@ const Laboratorio = () => {
                   Construye prompts que crucen el corpus filosófico con las tensiones del mapa.
                 </p>
 
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Analiza la tensión entre [miedo] y [legitimidad] en el contexto de..."
-                  className="w-full h-32 p-4 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground font-system text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors"
-                />
-
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-system">
-                    {prompt.length} caracteres
-                  </span>
-                  <button 
-                    disabled
-                    className="px-4 py-2 rounded-lg bg-primary/50 text-primary-foreground font-system text-sm cursor-not-allowed opacity-50"
-                  >
-                    Ejecutar (Requiere acceso)
-                  </button>
-                </div>
+                <LabDemo />
               </div>
 
               {/* Analysis Capabilities */}

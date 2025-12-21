@@ -1,4 +1,5 @@
 import { Play, Clock, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface Episode {
   id: string;
@@ -33,7 +34,9 @@ const EpisodeCard = ({ episode, onPlay }: EpisodeCardProps) => {
 
       {/* Title */}
       <h3 className="mt-2 font-philosophy text-xl text-foreground group-hover:text-primary transition-colors pr-16">
-        {episode.title}
+        <Link to={`/podcast/${episode.id}`} className="inline-block focus:outline-none focus:ring-2 focus:ring-primary/40">
+          {episode.title}
+        </Link>
       </h3>
 
       {/* Description */}
