@@ -1,10 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import LabDemo from '@/components/LabDemo';
-import { Beaker, Lock, Sparkles, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Beaker, Lock, Sparkles, AlertTriangle, LogOut, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Laboratorio = () => {
   const [prompt, setPrompt] = useState('');
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -34,23 +62,28 @@ const Laboratorio = () => {
           </div>
         </section>
 
-        {/* Access Warning */}
+        {/* User Info */}
         <section className="py-12">
           <div className="max-w-4xl mx-auto px-6">
-            <div className="bg-card border border-amber-dim/30 rounded-lg p-8">
-              <div className="flex items-start gap-4">
-                <div className="p-2 rounded-full bg-amber-dim/20">
-                  <Lock className="w-5 h-5 text-amber" />
+            <div className="bg-card border border-primary/30 rounded-lg p-8">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 rounded-full bg-primary/20">
+                    <Beaker className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-philosophy text-xl text-foreground">
+                      Acceso Completo
+                    </h2>
+                    <p className="mt-2 text-muted-foreground">
+                      Conectado como: <span className="text-primary">{user.email}</span>
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-philosophy text-xl text-foreground">
-                    Acceso Restringido
-                  </h2>
-                  <p className="mt-2 text-muted-foreground">
-                    El laboratorio completo requiere autenticación. 
-                    Esta es una vista previa de las capacidades del sistema.
-                  </p>
-                </div>
+                <Button variant="outline" size="sm" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Cerrar Sesión
+                </Button>
               </div>
             </div>
           </div>
