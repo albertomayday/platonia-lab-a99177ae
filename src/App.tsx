@@ -11,34 +11,39 @@ import Corpus from "./pages/Corpus";
 import CorpusDetail from "./pages/CorpusDetail";
 import NotFound from "./pages/NotFound";
 import EpisodePage from "./pages/Episode";
+import Auth from "./pages/Auth";
 import { NavigationProvider } from "./lib/navigation";
 import ScrollAndFocus from "./components/ScrollAndFocus";
+import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter basename="/platonia-lab">
-        <NavigationProvider>
-          <ScrollAndFocus />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/mapa" element={<Mapa />} />
-            <Route path="/map" element={<Navigate to="/mapa" replace />} />
-            <Route path="/podcast" element={<Podcast />} />
-            <Route path="/podcast/:id" element={<EpisodePage />} />
-            <Route path="/laboratorio" element={<Laboratorio />} />
-            <Route path="/lab" element={<Navigate to="/laboratorio" replace />} />
-            <Route path="/corpus" element={<Corpus />} />
-            <Route path="/corpus/:slug" element={<CorpusDetail />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </NavigationProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter basename="/platonia-lab">
+          <NavigationProvider>
+            <ScrollAndFocus />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/mapa" element={<Mapa />} />
+              <Route path="/map" element={<Navigate to="/mapa" replace />} />
+              <Route path="/podcast" element={<Podcast />} />
+              <Route path="/podcast/:id" element={<EpisodePage />} />
+              <Route path="/laboratorio" element={<Laboratorio />} />
+              <Route path="/lab" element={<Navigate to="/laboratorio" replace />} />
+              <Route path="/corpus" element={<Corpus />} />
+              <Route path="/corpus/:slug" element={<CorpusDetail />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </NavigationProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
