@@ -72,7 +72,9 @@ const LagrangeMap = ({ onNodeSelect, initialZoom = 1 }: LagrangeMapProps) => {
 
     const load = async () => {
       try {
-        const res = await fetch("/svg/map.svg");
+        const basePath = import.meta.env.BASE_URL || "/";
+        const svgPath = `${basePath}svg/map.svg`.replace(/\/+/g, "/");
+        const res = await fetch(svgPath);
         if (!res.ok) throw new Error("No SVG");
         const text = await res.text();
         if (!mounted) return;
