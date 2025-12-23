@@ -96,7 +96,15 @@ const Podcast = () => {
                 <AudioPlayer
                   title={selectedEpisodeData.title}
                   episodeNumber={selectedEpisodeData.id.replace("ep", "")}
-                  duration={selectedEpisodeData.duration}
+                  duration={
+                    typeof selectedEpisodeData.duration === "string"
+                      ? selectedEpisodeData.duration
+                      : "00:00"
+                  }
+                  audioUrl={
+                    selectedEpisodeData.audio_url ||
+                    selectedEpisodeData.audioUrl
+                  }
                   onTimeUpdate={setCurrentTime}
                 />
                 <TranscriptViewer

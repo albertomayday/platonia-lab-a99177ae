@@ -1,79 +1,167 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { useState, useRef, useEffect } from "react";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 
 interface AudioPlayerProps {
   title: string;
   episodeNumber: string;
   duration: string;
+  audioUrl?: string;
   onTimeUpdate?: (currentTime: number) => void;
 }
 
-const AudioPlayer = ({ title, episodeNumber, duration, onTimeUpdate }: AudioPlayerProps) => {
+const AudioPlayer = ({
+  title,
+  episodeNumber,
+  duration,
+  audioUrl,
+  onTimeUpdate,
+}: AudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.7);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  // Parse duration string to seconds
+  // Initialize audio element
   useEffect(() => {
-    const parts = duration.split(':');
-    if (parts.length === 2) {
-      const minutes = parseInt(parts[0], 10);
-      const seconds = parseInt(parts[1], 10);
-      setTotalDuration(minutes * 60 + seconds);
+    if (!audioUrl) {
+      setError("No hay archivo de audio disponible");
+      return;
     }
-  }, [duration]);
 
-  // Simulate playback for demo (no actual audio file)
+    const basePath = import.meta.env.BASE_URL || "/";
+    const fullAudioPath = audioUrl.startsWith("http")
+      ? audioUrl
+      : `${basePath}${audioUrl.replace(/^\//, "")}`.replace(/\/+/g, "/");
+
+    const audio = new Audio(fullAudioPath);
+    audioRef.current = audio;
+
+    audio.volume = volume;
+    audio.muted = isMuted;
+
+    // Event listeners
+    const handleLoadedMetadata = () => {
+      setTotalDuration(audio.duration);
+      setIsLoading(false);
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      onTimeUpdate?.(audio.currentTime);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    const handleError = () => {
+      setError("Error al cargar el audio. Archivo no encontrado.");
+      setIsLoading(false);
+      setIsPlaying(false);
+    };
+
+    const handleCanPlay = () => {
+      setIsLoading(false);
+      setError(null);
+    };
+
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
+
+    setIsLoading(true);
+
+    return () => {
+      audio.pause();
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.src = "";
+    };
+  }, [audioUrl, onTimeUpdate]);
+
+  // Update volume
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && currentTime < totalDuration) {
-      interval = setInterval(() => {
-        setCurrentTime(prev => {
-          const newTime = prev + 1;
-          onTimeUpdate?.(newTime);
-          if (newTime >= totalDuration) {
-            setIsPlaying(false);
-            return totalDuration;
-          }
-          return newTime;
-        });
-      }, 1000);
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, totalDuration, onTimeUpdate, currentTime]);
+  }, [volume]);
 
-  const togglePlay = () => setIsPlaying(!isPlaying);
+  // Update mute
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  const togglePlay = () => {
+    if (!audioRef.current || error) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch((err) => {
+        console.error("Error playing audio:", err);
+        setError("Error al reproducir el audio");
+      });
+    }
+    setIsPlaying(!isPlaying);
+  };
   const toggleMute = () => setIsMuted(!isMuted);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressRef.current) return;
+    if (!progressRef.current || !audioRef.current) return;
     const rect = progressRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
     const newTime = percentage * totalDuration;
+    audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
-    onTimeUpdate?.(newTime);
   };
 
   const skipBack = () => {
+    if (!audioRef.current) return;
     const newTime = Math.max(0, currentTime - 15);
-    setCurrentTime(newTime);
-    onTimeUpdate?.(newTime);
+    audioRef.current.currentTime = newTime;
   };
 
   const skipForward = () => {
+    if (!audioRef.current) return;
     const newTime = Math.min(totalDuration, currentTime + 15);
-    setCurrentTime(newTime);
-    onTimeUpdate?.(newTime);
+    audioRef.current.currentTime = newTime;
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    if (newVolume > 0 && isMuted) {
+      setIsMuted(false);
+    }
   };
 
   const progress = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
@@ -85,20 +173,28 @@ const AudioPlayer = ({ title, episodeNumber, duration, onTimeUpdate }: AudioPlay
         <span className="font-system text-xs text-primary uppercase tracking-wider">
           Episodio {episodeNumber}
         </span>
-        <h3 className="font-philosophy text-lg text-foreground mt-1">{title}</h3>
+        <h3 className="font-philosophy text-lg text-foreground mt-1">
+          {title}
+        </h3>
+        {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+        {isLoading && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Cargando audio...
+          </p>
+        )}
       </div>
 
       {/* Progress bar */}
-      <div 
+      <div
         ref={progressRef}
         onClick={handleProgressClick}
         className="relative h-2 bg-secondary rounded-full cursor-pointer group mb-4"
       >
-        <div 
+        <div
           className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
           style={{ width: `${progress}%` }}
         />
-        <div 
+        <div
           className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ left: `calc(${progress}% - 6px)` }}
         />
