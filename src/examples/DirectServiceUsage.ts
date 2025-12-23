@@ -46,7 +46,7 @@ export async function labServiceExample() {
 
   if (demosResponse.data) {
     console.log(`Found ${demosResponse.data.length} demos`);
-    demosResponse.data.forEach((demo, i) => {
+    demosResponse.data.forEach((demo: { prompt: string }, i: number) => {
       console.log(`  ${i + 1}. ${demo.prompt.substring(0, 50)}...`);
     });
   }
@@ -81,10 +81,13 @@ export async function mapServiceExample() {
     console.log(`Total nodes: ${nodesResponse.data.length}`);
 
     // Group by axis
-    const byAxis = nodesResponse.data.reduce((acc, node) => {
-      acc[node.axis] = (acc[node.axis] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const byAxis = nodesResponse.data.reduce(
+      (acc: Record<string, number>, node: { axis: string }) => {
+        acc[node.axis] = (acc[node.axis] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     console.log("Nodes by axis:", byAxis);
   }
@@ -93,9 +96,11 @@ export async function mapServiceExample() {
   const l1Nodes = await mapService.getNodesByAxis("L1_miedo");
   if (l1Nodes.data) {
     console.log(`\nL1_miedo nodes: ${l1Nodes.data.length}`);
-    l1Nodes.data.slice(0, 3).forEach((node) => {
-      console.log(`  - ${node.label}: ${node.description}`);
-    });
+    l1Nodes.data
+      .slice(0, 3)
+      .forEach((node: { label: string; description: string }) => {
+        console.log(`  - ${node.label}: ${node.description}`);
+      });
   }
 
   // 3. Create a new node
@@ -129,12 +134,14 @@ export async function corpusServiceExample() {
 
   if (entries.data) {
     console.log(`Published entries: ${entries.data.length}`);
-    entries.data.forEach((entry, i) => {
-      console.log(`  ${i + 1}. ${entry.title} (${entry.slug})`);
-      if (entry.excerpt) {
-        console.log(`     ${entry.excerpt.substring(0, 60)}...`);
+    entries.data.forEach(
+      (entry: { title: string; slug: string; excerpt?: string }, i: number) => {
+        console.log(`  ${i + 1}. ${entry.title} (${entry.slug})`);
+        if (entry.excerpt) {
+          console.log(`     ${entry.excerpt.substring(0, 60)}...`);
+        }
       }
-    });
+    );
   }
 
   // 2. Search entries
@@ -157,10 +164,14 @@ export async function podcastServiceExample() {
 
   if (episodes.data) {
     console.log(`Total episodes: ${episodes.data.length}`);
-    episodes.data.slice(0, 3).forEach((ep) => {
-      console.log(`  Ep ${ep.episode_number}: ${ep.title}`);
-      console.log(`     Duration: ${ep.duration} seconds`);
-    });
+    episodes.data
+      .slice(0, 3)
+      .forEach(
+        (ep: { episode_number: number; title: string; duration: number }) => {
+          console.log(`  Ep ${ep.episode_number}: ${ep.title}`);
+          console.log(`     Duration: ${ep.duration} seconds`);
+        }
+      );
   }
 
   // 2. Get specific episode
@@ -196,7 +207,7 @@ export async function socraticServiceExample() {
 
   if (randomQuestions.data) {
     console.log("\nRandom L1_miedo questions:");
-    randomQuestions.data.forEach((q, i) => {
+    randomQuestions.data.forEach((q: { text: string }, i: number) => {
       console.log(`  ${i + 1}. ${q.text}`);
     });
   }
@@ -221,13 +232,24 @@ export async function fileServiceExample() {
 
   if (uploads.data) {
     console.log(`Recent uploads: ${uploads.data.length}`);
-    uploads.data.slice(0, 3).forEach((upload) => {
-      console.log(
-        `  - ${upload.filename} (${(upload.size_bytes / 1024).toFixed(2)} KB)`
+    uploads.data
+      .slice(0, 3)
+      .forEach(
+        (upload: {
+          filename: string;
+          size_bytes: number;
+          mime_type: string;
+          storage_provider: string;
+        }) => {
+          console.log(
+            `  - ${upload.filename} (${(upload.size_bytes / 1024).toFixed(
+              2
+            )} KB)`
+          );
+          console.log(`    Type: ${upload.mime_type}`);
+          console.log(`    Provider: ${upload.storage_provider}`);
+        }
       );
-      console.log(`    Type: ${upload.mime_type}`);
-      console.log(`    Provider: ${upload.storage_provider}`);
-    });
   }
 
   console.log("\n");
