@@ -58,8 +58,8 @@ export function MapExample() {
   };
 
   const handleUpdatePosition = (node: Node) => {
-    const newX = (node.position_x || 0) + 50;
-    const newY = (node.position_y || 0) + 50;
+    const newX = (node.x || 0) + 50;
+    const newY = (node.y || 0) + 50;
 
     updatePositionMutation.mutate(
       { id: node.id, x: newX, y: newY },
@@ -171,8 +171,8 @@ export function MapExample() {
 
                 <div className="flex justify-between items-center text-xs text-gray-500">
                   <span>
-                    Posición: ({node.position_x?.toFixed(0) || 0},{" "}
-                    {node.position_y?.toFixed(0) || 0})
+                    Posición: ({node.x?.toFixed(0) || 0},{" "}
+                    {node.y?.toFixed(0) || 0})
                   </span>
                   <Button
                     onClick={() => handleUpdatePosition(node)}
