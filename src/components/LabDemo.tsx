@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
-import nodesData from '@/data/nodes.json';
-import questionsData from '@/data/socraticQuestions.json';
-import { saveDemoResult, generateWithOpenAI } from '@/lib/backend';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { useLabHistory } from '@/hooks/useLabHistory';
+import { analyzeWithAI } from '@/utils/aiPipeline';
+import { fetchNodes, fetchSocraticQuestions } from '@/utils/dataLoader';
+import { saveDemoResult } from '@/lib/backend';
+import type { Node, SocraticQuestion, AnalysisResponse } from '@/types';
+import { Sparkles, Loader2, History, Trash2, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Result {
   axes: string[];
@@ -10,6 +13,8 @@ interface Result {
   questions: Array<{ id: string; text: string; axis: string }>;
   summary: string;
   aiResponse?: string;
+  warnings?: string[];
+  tensionLevel?: number;
 }
 
 const extractBracketTokens = (text: string) => {
@@ -25,219 +30,305 @@ const extractBracketTokens = (text: string) => {
 const LabDemo: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [running, setRunning] = useState(false);
-  const [generatingAI, setGeneratingAI] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [questions, setQuestions] = useState<SocraticQuestion[]>([]);
 
-  const nodes = useMemo(() => nodesData.nodes, []);
-  const questions = useMemo(() => questionsData.questions, []);
+  const { history, addAnalysis, clearHistory, exportHistory } = useLabHistory();
 
-  const runDemo = async () => {
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setNodes(await fetchNodes());
+      setQuestions(await fetchSocraticQuestions());
+    };
+    loadData();
+  }, []);
+
+  const runAnalysis = async () => {
+    if (!prompt.trim()) return;
+    
     setRunning(true);
     setResult(null);
 
-    await new Promise((r) => setTimeout(r, 300));
+    try {
+      // Extract bracket tokens for node matching
+      const tokens = extractBracketTokens(prompt).map(t => t.toLowerCase());
+      const matchedNodes = new Set<string>();
+      const matchedAxes = new Set<string>();
 
-    const tokens = extractBracketTokens(prompt).map(t => t.toLowerCase());
-    const matchedNodes = new Set<string>();
-    const matchedAxes = new Set<string>();
-
-    if (tokens.length) {
-      tokens.forEach((tok) => {
-        const byId = nodes.find((n: any) => n.id.toLowerCase() === tok);
-        if (byId) {
-          matchedNodes.add(byId.id);
-          matchedAxes.add(byId.axis);
-        } else {
-          const byLabel = nodes.find((n: any) => n.label.toLowerCase() === tok);
-          if (byLabel) {
-            matchedNodes.add(byLabel.id);
-            matchedAxes.add(byLabel.axis);
+      // Match by tokens
+      if (tokens.length) {
+        tokens.forEach((tok) => {
+          const byId = nodes.find((n) => n.id.toLowerCase() === tok);
+          if (byId) {
+            matchedNodes.add(byId.id);
+            matchedAxes.add(byId.axis);
+          } else {
+            const byLabel = nodes.find((n) => n.label.toLowerCase() === tok);
+            if (byLabel) {
+              matchedNodes.add(byLabel.id);
+              matchedAxes.add(byLabel.axis);
+            }
           }
-        }
-      });
-    }
-
-    if (matchedNodes.size === 0 && prompt.trim().length > 0) {
-      const lowered = prompt.toLowerCase();
-      nodes.forEach((n: any) => {
-        if (lowered.includes(n.label.toLowerCase()) || lowered.includes(n.id.toLowerCase())) {
-          matchedNodes.add(n.id);
-          matchedAxes.add(n.axis);
-        }
-      });
-    }
-
-    const matchedQuestions: Array<{ id: string; text: string; axis: string }> = [];
-    if (matchedNodes.size) {
-      questions.forEach((q: any) => {
-        const related = (q.relatedNodes || []).map((r: string) => r.toLowerCase());
-        const intersects = Array.from(matchedNodes).some(m => related.includes(m.toLowerCase()));
-        if (intersects) matchedQuestions.push({ id: q.id, text: q.text, axis: q.axis });
-      });
-    }
-
-    if (matchedQuestions.length === 0) {
-      matchedQuestions.push(...questions.slice(0, 2).map((q: any) => ({ id: q.id, text: q.text, axis: q.axis })));
-    }
-
-    const summary = matchedQuestions.length
-      ? `Propuesta: ${matchedQuestions.length} preguntas relevantes sobre los ejes ${Array.from(matchedAxes).join(', ') || 'general'}`
-      : 'No se encontraron correspondencias claras.';
-
-    const resObj: Result = { 
-      axes: Array.from(matchedAxes), 
-      matchedNodes: Array.from(matchedNodes), 
-      questions: matchedQuestions, 
-      summary 
-    };
-    setResult(resObj);
-
-    // Save to database
-    try {
-      const saved = await saveDemoResult({ 
-        prompt, 
-        summary: resObj.summary, 
-        axes: resObj.axes, 
-        matchedNodes: resObj.matchedNodes, 
-        questions: resObj.questions 
-      });
-      if (saved?.error) {
-        console.warn('Demo save failed:', saved.error);
-      } else if (saved?.id) {
-        console.info('Demo saved id:', saved.id);
+        });
       }
-    } catch (e) {
-      console.warn('Demo save error', e);
-    }
-    
-    setRunning(false);
-  };
 
-  const handleGenerateAI = async () => {
-    if (!result) return;
-    
-    setGeneratingAI(true);
-    
-    const context = `Ejes temáticos: ${result.axes.join(', ') || 'general'}. 
-Nodos relacionados: ${result.matchedNodes.join(', ') || 'ninguno específico'}.
-Preguntas sugeridas: ${result.questions.map(q => q.text).join('; ')}`;
+      // Match by content if no tokens found
+      if (matchedNodes.size === 0) {
+        const lowered = prompt.toLowerCase();
+        nodes.forEach((n) => {
+          if (lowered.includes(n.label.toLowerCase()) || lowered.includes(n.id.toLowerCase())) {
+            matchedNodes.add(n.id);
+            matchedAxes.add(n.axis);
+          }
+        });
+      }
 
-    try {
-      const response = await generateWithOpenAI(prompt, context);
+      // Find related questions
+      const matchedQuestions: Array<{ id: string; text: string; axis: string }> = [];
+      if (matchedNodes.size) {
+        questions.forEach((q) => {
+          const related = (q.relatedNodes || q.related_nodes || []).map((r) => r.toLowerCase());
+          const intersects = Array.from(matchedNodes).some(m => related.includes(m.toLowerCase()));
+          if (intersects) matchedQuestions.push({ id: q.id, text: q.text, axis: q.axis });
+        });
+      }
+
+      if (matchedQuestions.length === 0) {
+        matchedQuestions.push(...questions.slice(0, 2).map((q) => ({ id: q.id, text: q.text, axis: q.axis })));
+      }
+
+      // Run AI analysis
+      const aiResult = await analyzeWithAI({
+        userInput: prompt,
+        targetAxis: Array.from(matchedAxes)[0],
+      });
+
+      const summary = `Análisis completado: ${matchedQuestions.length} preguntas relevantes sobre los ejes ${Array.from(matchedAxes).join(', ') || 'general'}`;
+
+      const resObj: Result = { 
+        axes: Array.from(matchedAxes), 
+        matchedNodes: Array.from(matchedNodes), 
+        questions: matchedQuestions, 
+        summary,
+        aiResponse: aiResult.analysis,
+        warnings: aiResult.warnings,
+        tensionLevel: aiResult.tensionLevel,
+      };
       
-      if (response.ok && response.text) {
-        setResult(prev => prev ? { ...prev, aiResponse: response.text } : null);
-        
-        // Update saved demo with AI response
+      setResult(resObj);
+
+      // Add to history
+      addAnalysis(prompt, aiResult);
+
+      // Save to database
+      try {
         await saveDemoResult({ 
           prompt, 
-          summary: result.summary, 
-          axes: result.axes, 
-          matchedNodes: result.matchedNodes, 
-          questions: result.questions,
-          aiResponse: response.text,
+          summary: resObj.summary, 
+          axes: resObj.axes, 
+          matchedNodes: resObj.matchedNodes, 
+          questions: resObj.questions,
+          aiResponse: resObj.aiResponse,
         });
-      } else if (response.error) {
-        console.error('AI generation error:', response.error);
-        setResult(prev => prev ? { ...prev, aiResponse: `Error: ${response.error}` } : null);
+      } catch (e) {
+        console.warn('Demo save error', e);
       }
     } catch (e) {
-      console.error('AI generation failed:', e);
-      setResult(prev => prev ? { ...prev, aiResponse: 'Error al generar respuesta.' } : null);
+      console.error('Analysis error:', e);
+      setResult({
+        axes: [],
+        matchedNodes: [],
+        questions: [],
+        summary: 'Error al procesar el análisis.',
+      });
     } finally {
-      setGeneratingAI(false);
+      setRunning(false);
     }
+  };
+
+  const handleExportHistory = () => {
+    const json = exportHistory();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lab-history-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadFromHistory = (userInput: string) => {
+    setPrompt(userInput);
+    setShowHistory(false);
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h3 className="font-philosophy text-lg text-foreground">Laboratorio — Demo de prompts</h3>
-      </div>
-
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Analiza la tensión entre [miedo] y [legitimidad] en el contexto de..."
-        className="w-full h-32 p-4 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground font-system text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors"
-      />
-
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={runDemo}
-            disabled={running || prompt.trim().length === 0}
-            className={`px-4 py-2 rounded-lg bg-primary text-primary-foreground font-system text-sm uppercase tracking-wider transition-opacity flex items-center gap-2 ${running || prompt.trim().length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'}`}
+    <div className="space-y-4">
+      {/* Main input area */}
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-philosophy text-lg text-foreground">Análisis Socrático</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-muted-foreground"
           >
-            {running && <Loader2 className="w-4 h-4 animate-spin" />}
-            Ejecutar demo
-          </button>
-
-          <button
-            onClick={() => { setPrompt(''); setResult(null); }}
-            className="px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground"
-          >
-            Limpiar
-          </button>
+            <History className="w-4 h-4 mr-1" />
+            Historial ({history.length})
+            {showHistory ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+          </Button>
         </div>
 
-        <div className="text-xs text-muted-foreground">{prompt.length} caracteres</div>
+        {/* History panel */}
+        {showHistory && (
+          <div className="mb-4 p-4 bg-background border border-border rounded-lg max-h-48 overflow-y-auto">
+            {history.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Sin historial</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">Análisis anteriores</span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleExportHistory}>
+                      <Download className="w-3 h-3 mr-1" />
+                      Exportar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={clearHistory} className="text-destructive">
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Limpiar
+                    </Button>
+                  </div>
+                </div>
+                {history.slice(0, 5).map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => loadFromHistory(entry.userInput)}
+                    className="w-full text-left p-2 rounded bg-card hover:bg-primary/10 transition-colors"
+                  >
+                    <p className="text-sm text-foreground truncate">{entry.userInput}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(entry.timestamp).toLocaleDateString('es-ES', { 
+                        day: 'numeric', 
+                        month: 'short', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Analiza la tensión entre [miedo] y [legitimidad] en el contexto de..."
+          className="w-full h-32 p-4 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground font-system text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors"
+        />
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={runAnalysis}
+              disabled={running || prompt.trim().length === 0}
+              className="gap-2"
+            >
+              {running ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {running ? 'Analizando...' : 'Analizar'}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => { setPrompt(''); setResult(null); }}
+            >
+              Limpiar
+            </Button>
+          </div>
+
+          <div className="text-xs text-muted-foreground">{prompt.length} caracteres</div>
+        </div>
       </div>
 
+      {/* Results */}
       {result && (
-        <div className="mt-6">
-          <div className="mb-3 text-sm text-muted-foreground">Resumen</div>
-          <div className="bg-background border border-border rounded-lg p-4">
-            <div className="font-medium text-foreground mb-2">{result.summary}</div>
+        <div className="bg-card border border-border rounded-lg p-6 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-muted-foreground">Resultado del Análisis</div>
+            {result.tensionLevel !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Tensión:</span>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-1.5 h-3 rounded-sm ${
+                        i < result.tensionLevel! 
+                          ? 'bg-primary' 
+                          : 'bg-muted'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-primary font-medium">{result.tensionLevel}/10</span>
+              </div>
+            )}
+          </div>
 
-            <div className="flex flex-wrap gap-2 mt-2">
-              {result.axes.length ? result.axes.map((a) => (
-                <span key={a} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-system">{a}</span>
-              )) : <span className="text-xs text-muted-foreground">Ejes: —</span>}
-            </div>
-
-            <div className="mt-4">
-              <div className="text-sm text-muted-foreground mb-2">Preguntas sugeridas</div>
-              <ul className="space-y-3">
-                {result.questions.map((q) => (
-                  <li key={q.id} className="p-3 bg-card border border-border rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-foreground font-medium">{q.text}</div>
-                      <span className="text-xs text-muted-foreground">{q.axis}</span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1 text-primary">Sugerida</span>
-                      <span className="ml-auto text-muted-foreground">#{q.id}</span>
-                    </div>
-                  </li>
+          {/* Warnings */}
+          {result.warnings && result.warnings.length > 0 && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <div className="text-sm font-medium text-destructive mb-1">Advertencias (Regla de Oro)</div>
+              <ul className="space-y-1">
+                {result.warnings.map((warning, i) => (
+                  <li key={i} className="text-xs text-destructive/80">{warning}</li>
                 ))}
               </ul>
             </div>
+          )}
 
-            {/* AI Response Section */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-muted-foreground">Respuesta IA (OpenAI)</div>
-                <button
-                  onClick={handleGenerateAI}
-                  disabled={generatingAI}
-                  className={`px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-system flex items-center gap-1.5 transition-opacity ${generatingAI ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/20'}`}
-                >
-                  {generatingAI ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3 h-3" />
-                  )}
-                  {generatingAI ? 'Generando...' : 'Generar con IA'}
-                </button>
-              </div>
-              
-              {result.aiResponse && (
-                <div className="p-3 bg-card border border-border rounded-lg">
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{result.aiResponse}</p>
-                </div>
-              )}
+          {/* AI Response */}
+          {result.aiResponse && (
+            <div className="mb-4 p-4 bg-background border border-border rounded-lg">
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                {result.aiResponse}
+              </p>
             </div>
+          )}
+
+          {/* Axes */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {result.axes.length ? result.axes.map((a) => (
+              <span key={a} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-system">
+                {a}
+              </span>
+            )) : (
+              <span className="text-xs text-muted-foreground">Ejes: —</span>
+            )}
+          </div>
+
+          {/* Questions */}
+          <div>
+            <div className="text-sm text-muted-foreground mb-2">Preguntas Socráticas Sugeridas</div>
+            <ul className="space-y-3">
+              {result.questions.map((q) => (
+                <li key={q.id} className="p-3 bg-background border border-border rounded-lg">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm text-foreground font-medium">{q.text}</div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{q.axis}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
