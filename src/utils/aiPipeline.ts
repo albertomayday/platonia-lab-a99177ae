@@ -3,9 +3,14 @@
  * Functions for socratic analysis using AI
  */
 
-import { generateWithOpenAI } from '@/lib/backend';
-import type { AnalysisRequest, AnalysisResponse, Node, SocraticQuestion } from '@/types';
-import { fetchNodes, fetchSocraticQuestions } from './dataLoader';
+import { generateWithOpenAI } from "@/lib/backend";
+import type {
+  AnalysisRequest,
+  AnalysisResponse,
+  Node,
+  SocraticQuestion,
+} from "@/types";
+import { fetchNodes, fetchSocraticQuestions } from "./dataLoader";
 
 // Tension validation threshold (Regla de Oro)
 const TENSION_THRESHOLD = 0.7;
@@ -17,35 +22,43 @@ const TENSION_THRESHOLD = 0.7;
 /**
  * Analyze user input with AI and return socratic analysis
  */
-export async function analyzeWithAI(request: AnalysisRequest): Promise<AnalysisResponse> {
+export async function analyzeWithAI(
+  request: AnalysisRequest
+): Promise<AnalysisResponse> {
   const { userInput, context, targetAxis } = request;
 
   try {
     // Build the prompt for OpenAI
     const systemPrompt = buildSystemPrompt(targetAxis);
-    const fullPrompt = context 
+    const fullPrompt = context
       ? `Contexto: ${context}\n\nInput del usuario: ${userInput}`
       : userInput;
 
     // Call the OpenAI edge function via backend entry-point
-    const aiResp = await generateWithOpenAI(fullPrompt, await buildContextFromGraph());
+    const aiResp = await generateWithOpenAI(
+      fullPrompt,
+      await buildContextFromGraph()
+    );
     if (aiResp.error) {
-      console.error('AI analysis error:', aiResp.error);
+      console.error("AI analysis error:", aiResp.error);
       return generateMockResponse(userInput);
     }
 
     // Parse and structure the response
-    const aiText = aiResp.text || '';
-    
+    const aiText = aiResp.text || "";
+
     // Extract related nodes based on content analysis
     const relatedNodes = await findRelatedNodes(userInput, aiText);
-    
+
     // Generate follow-up questions
-    const generatedQuestions = await generateSocraticQuestions(userInput, relatedNodes);
-    
+    const generatedQuestions = await generateSocraticQuestions(
+      userInput,
+      relatedNodes
+    );
+
     // Calculate tension level
     const tensionLevel = calculateTensionLevel(userInput, aiText);
-    
+
     // Validate and generate warnings
     const warnings = validateTension(aiText, tensionLevel);
 
@@ -58,7 +71,7 @@ export async function analyzeWithAI(request: AnalysisRequest): Promise<AnalysisR
       ok: true,
     };
   } catch (e) {
-    console.error('AI pipeline error:', e);
+    console.error("AI pipeline error:", e);
     return generateMockResponse(userInput);
   }
 }
@@ -71,17 +84,39 @@ export async function analyzeWithAI(request: AnalysisRequest): Promise<AnalysisR
  * Build system prompt based on target axis
  */
 function buildSystemPrompt(targetAxis?: string): string {
-  const basePrompt = `Eres un asistente socrático del Sistema Lagrange. Tu función es:
-1. Analizar críticamente las afirmaciones del usuario
-2. Formular preguntas que revelen contradicciones o supuestos ocultos
-3. Identificar conexiones con los ejes Lagrange (Miedo, Control, Legitimidad, Salud Mental, Responsabilidad)
-4. Nunca dar respuestas definitivas, siempre abrir nuevas líneas de reflexión
-5. Mantener un tono filosófico pero accesible
+  const basePrompt = `Eres un filósofo socrático especializado en análisis dialéctico profundo del Sistema Lagrange. 
 
-IMPORTANTE: La "Regla de Oro" del sistema es mantener la tensión dialéctica sin resolverla.`;
+Tu tarea es realizar análisis filosóficos rigurosos que:
+
+1. IDENTIFIQUEN TENSIONES: Localiza contradicciones, paradojas y tensiones dialécticas en el input.
+
+2. EXPLOREN LÍMITES: Examina los límites conceptuales, zonas grises y ambigüedades productivas.
+
+3. GENEREN PREGUNTAS PROFUNDAS: Formula preguntas socráticas que profundicen sin cerrar el problema.
+
+4. MANTENGAN APERTURA: No resuelvas la tensión. Mantenla abierta como espacio de pensamiento crítico.
+
+5. CONTEXTO LAGRANGIANO: Analiza en términos de los cinco ejes de tensión:
+   - L1: Miedo (ontología de la amenaza)
+   - L2: Control (poder y gestión)
+   - L3: Legitimidad (narrativas y verdad)
+   - L4: Salud Mental (normalización y desviación)
+   - L5: Responsabilidad (agencia y determinación)
+
+REGLAS CRÍTICAS:
+- NO simplificar ni consolar
+- NO ofrecer "soluciones" o "respuestas definitivas"
+- Revelar complejidad, no ocultarla
+- Lenguaje preciso y riguroso
+- La "Regla de Oro": mantener tensión dialéctica sin resolverla
+
+FORMATO ESPERADO:
+- Análisis filosófico profundo (2-3 párrafos densos)
+- Identificación explícita de tensiones entre ejes
+- 2-3 preguntas socráticas que profundicen el análisis`;
 
   if (targetAxis) {
-    return `${basePrompt}\n\nEnfócate especialmente en el eje: ${targetAxis}`;
+    return `${basePrompt}\n\nFOCO ESPECÍFICO: Enfócate en el eje "${targetAxis}" y sus tensiones dialécticas con los otros ejes del sistema.`;
   }
 
   return basePrompt;
@@ -95,35 +130,41 @@ async function buildContextFromGraph(): Promise<string> {
     const nodes = await fetchNodes();
     const nodeDescriptions = nodes
       .map((n) => `- ${n.label}: ${n.description}`)
-      .join('\n');
-    
+      .join("\n");
+
     return `Nodos conceptuales del sistema:\n${nodeDescriptions}`;
   } catch (e) {
-    return '';
+    return "";
   }
 }
 
 /**
  * Find nodes related to the user input and AI response
  */
-async function findRelatedNodes(userInput: string, aiResponse: string): Promise<string[]> {
+async function findRelatedNodes(
+  userInput: string,
+  aiResponse: string
+): Promise<string[]> {
   const nodes = await fetchNodes();
   const combinedText = `${userInput} ${aiResponse}`.toLowerCase();
-  
+
   const relatedIds: string[] = [];
-  
+
   for (const node of nodes) {
     const keywords = [
       node.label.toLowerCase(),
       node.id.toLowerCase(),
-      ...node.description.toLowerCase().split(' ').filter((w) => w.length > 4),
+      ...node.description
+        .toLowerCase()
+        .split(" ")
+        .filter((w) => w.length > 4),
     ];
-    
+
     if (keywords.some((keyword) => combinedText.includes(keyword))) {
       relatedIds.push(node.id);
     }
   }
-  
+
   return [...new Set(relatedIds)];
 }
 
@@ -135,27 +176,25 @@ async function generateSocraticQuestions(
   relatedNodes: string[]
 ): Promise<string[]> {
   const allQuestions = await fetchSocraticQuestions();
-  
+
   // Filter questions related to the identified nodes
   const relevantQuestions = allQuestions.filter(
     (q) =>
       q.relatedNodes?.some((n) => relatedNodes.includes(n)) ||
       q.related_nodes?.some((n) => relatedNodes.includes(n))
   );
-  
+
   // If no relevant questions found, return some generic ones
   if (relevantQuestions.length === 0) {
     return [
-      '¿Qué supuestos estás dando por válidos sin cuestionarlos?',
-      '¿Quién se beneficia de que pienses así?',
-      '¿Cómo sabrías si estuvieras equivocado?',
+      "¿Qué supuestos estás dando por válidos sin cuestionarlos?",
+      "¿Quién se beneficia de que pienses así?",
+      "¿Cómo sabrías si estuvieras equivocado?",
     ];
   }
-  
+
   // Return up to 3 relevant questions
-  return relevantQuestions
-    .slice(0, 3)
-    .map((q) => q.text || q.question || '');
+  return relevantQuestions.slice(0, 3).map((q) => q.text || q.question || "");
 }
 
 /**
@@ -163,31 +202,31 @@ async function generateSocraticQuestions(
  */
 function calculateTensionLevel(userInput: string, aiResponse: string): number {
   const tensionKeywords = [
-    'contradicción',
-    'conflicto',
-    'paradoja',
-    'tensión',
-    'ambiguo',
-    'incierto',
-    'cuestionar',
-    'supuesto',
-    'oculto',
-    'verdad',
-    'poder',
-    'control',
-    'miedo',
-    'legitimidad',
+    "contradicción",
+    "conflicto",
+    "paradoja",
+    "tensión",
+    "ambiguo",
+    "incierto",
+    "cuestionar",
+    "supuesto",
+    "oculto",
+    "verdad",
+    "poder",
+    "control",
+    "miedo",
+    "legitimidad",
   ];
-  
+
   const combinedText = `${userInput} ${aiResponse}`.toLowerCase();
   let score = 0;
-  
+
   for (const keyword of tensionKeywords) {
     if (combinedText.includes(keyword)) {
       score += 1;
     }
   }
-  
+
   // Normalize to 0-10 scale
   return Math.min(10, Math.round((score / tensionKeywords.length) * 10));
 }
@@ -195,16 +234,19 @@ function calculateTensionLevel(userInput: string, aiResponse: string): number {
 /**
  * Validate tension level and generate warnings (Regla de Oro)
  */
-export function validateTension(content: string, tensionLevel: number): string[] {
+export function validateTension(
+  content: string,
+  tensionLevel: number
+): string[] {
   const warnings: string[] = [];
-  
+
   // Check if tension is too low
   if (tensionLevel < 3) {
     warnings.push(
-      'Advertencia: El nivel de tensión dialéctica es bajo. La respuesta puede ser demasiado complaciente.'
+      "Advertencia: El nivel de tensión dialéctica es bajo. La respuesta puede ser demasiado complaciente."
     );
   }
-  
+
   // Check for definitive statements (violation of Golden Rule)
   const definitivePatterns = [
     /la verdad es que/i,
@@ -214,32 +256,37 @@ export function validateTension(content: string, tensionLevel: number): string[]
     /la respuesta es/i,
     /es obvio que/i,
   ];
-  
+
   for (const pattern of definitivePatterns) {
     if (pattern.test(content)) {
       warnings.push(
-        'Advertencia: Se detectaron afirmaciones definitivas. La Regla de Oro requiere mantener la tensión.'
+        "Advertencia: Se detectaron afirmaciones definitivas. La Regla de Oro requiere mantener la tensión."
       );
       break;
     }
   }
-  
+
   // Check for excessive agreement
-  const agreementPatterns = [/tienes razón/i, /estoy de acuerdo/i, /exactamente/i, /correcto/i];
-  
+  const agreementPatterns = [
+    /tienes razón/i,
+    /estoy de acuerdo/i,
+    /exactamente/i,
+    /correcto/i,
+  ];
+
   let agreementCount = 0;
   for (const pattern of agreementPatterns) {
     if (pattern.test(content)) {
       agreementCount++;
     }
   }
-  
+
   if (agreementCount >= 2) {
     warnings.push(
-      'Advertencia: Exceso de afirmación. El método socrático requiere cuestionar, no validar.'
+      "Advertencia: Exceso de afirmación. El método socrático requiere cuestionar, no validar."
     );
   }
-  
+
   return warnings;
 }
 
@@ -249,21 +296,24 @@ export function validateTension(content: string, tensionLevel: number): string[]
 
 function generateMockResponse(userInput: string): AnalysisResponse {
   const mockAnalyses = [
-    `Tu pregunta sobre "${userInput.substring(0, 50)}..." revela una tensión fundamental entre lo que asumimos y lo que realmente sabemos. ¿Has considerado que la premisa misma de tu pregunta podría estar condicionada por estructuras de poder que das por naturales?`,
+    `Tu pregunta sobre "${userInput.substring(
+      0,
+      50
+    )}..." revela una tensión fundamental entre lo que asumimos y lo que realmente sabemos. ¿Has considerado que la premisa misma de tu pregunta podría estar condicionada por estructuras de poder que das por naturales?`,
     `Interesante planteamiento. Pero pregunto: ¿desde qué posición de certeza formulas esta inquietud? El Sistema Lagrange nos recuerda que toda pregunta contiene ya una respuesta implícita. ¿Cuál es la que estás evitando formular?`,
     `Antes de responder, debo señalar que tu formulación asume varios supuestos. El eje del miedo (L1) nos enseña que muchas de nuestras preguntas nacen de ansiedades que preferimos no nombrar. ¿Qué miedo habita debajo de esta pregunta?`,
   ];
 
   const mockQuestions = [
-    '¿Qué pasaría si la respuesta que buscas no existiera?',
-    '¿Quién te enseñó a formular preguntas de esta manera?',
-    '¿Cómo cambiaría tu vida si supieras que estás equivocado?',
+    "¿Qué pasaría si la respuesta que buscas no existiera?",
+    "¿Quién te enseñó a formular preguntas de esta manera?",
+    "¿Cómo cambiaría tu vida si supieras que estás equivocado?",
   ];
 
   return {
     analysis: mockAnalyses[Math.floor(Math.random() * mockAnalyses.length)],
     generatedQuestions: mockQuestions,
-    relatedNodes: ['miedo', 'verdad', 'critica'],
+    relatedNodes: ["miedo", "verdad", "critica"],
     tensionLevel: 7,
     warnings: [],
     ok: true,
