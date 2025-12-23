@@ -31,11 +31,6 @@ jobs:
         run: rm -rf dist
 
       - name: Build
-        env:
-          # Las variables VITE_ se leen desde .env en el repositorio
-          # pero puedes sobrescribirlas aquí si necesitas diferentes valores para producción
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build
 
       - name: Ensure 404 page for SPA
