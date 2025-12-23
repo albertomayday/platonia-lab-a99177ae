@@ -1,16 +1,30 @@
-import { Link } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
-import CorpusCard from '@/components/CorpusCard';
-import { corpusIndex } from '@/data/corpus';
-import { BookOpen } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import Navigation from "@/components/Navigation";
+import CorpusCard from "@/components/CorpusCard";
+import { corpusService } from "@/services/api";
+import type { CorpusEntry } from "@/types";
+import { BookOpen } from "lucide-react";
 
 const Corpus = () => {
-  const publishedEntries = corpusIndex.filter(e => e.state === 'published');
+  const [entries, setEntries] = useState<CorpusEntry[]>([]);
+
+  useEffect(() => {
+    const loadEntries = async () => {
+      const response = await corpusService.fetchEntries({
+        status: "published",
+      });
+      if (response.data) {
+        setEntries(response.data);
+      }
+    };
+    loadEntries();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <main className="pt-16">
         <section className="py-16 border-b border-border">
           <div className="max-w-7xl mx-auto px-6">
@@ -26,10 +40,10 @@ const Corpus = () => {
             <h1 className="font-philosophy text-4xl md:text-5xl text-foreground">
               Corpus Filosófico
             </h1>
-            
+
             <p className="mt-6 max-w-2xl text-muted-foreground leading-relaxed">
-              Textos que exploran las tensiones del mapa. No buscan resolver — buscan mantener 
-              abierta la pregunta.
+              Textos que exploran las tensiones del mapa. No buscan resolver —
+              buscan mantener abierta la pregunta.
             </p>
           </div>
         </section>
@@ -37,7 +51,7 @@ const Corpus = () => {
         <section className="py-16">
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid md:grid-cols-2 gap-6">
-              {publishedEntries.map((entry) => (
+              {entries.map((entry) => (
                 <CorpusCard key={entry.id} entry={entry} />
               ))}
             </div>

@@ -1,11 +1,18 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useLabHistory } from '@/hooks/useLabHistory';
-import { analyzeWithAI } from '@/utils/aiPipeline';
-import { fetchNodes, fetchSocraticQuestions } from '@/utils/dataLoader';
-import { saveDemoResult } from '@/lib/backend';
-import type { Node, SocraticQuestion, AnalysisResponse } from '@/types';
-import { Sparkles, Loader2, History, Trash2, Download, ChevronDown, ChevronUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState, useEffect } from "react";
+import { useLabHistory } from "@/hooks/useLabHistory";
+import { analyzeWithAI } from "@/utils/aiPipeline";
+import { mapService, socraticService, labService } from "@/services/api";
+import type { Node, SocraticQuestion, AnalysisResponse } from "@/types";
+import {
+  Sparkles,
+  Loader2,
+  History,
+  Trash2,
+  Download,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Result {
   axes: string[];
@@ -28,7 +35,7 @@ const extractBracketTokens = (text: string) => {
 };
 
 const LabDemo: React.FC = () => {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -40,21 +47,28 @@ const LabDemo: React.FC = () => {
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
-      setNodes(await fetchNodes());
-      setQuestions(await fetchSocraticQuestions());
+      const nodesResponse = await mapService.fetchNodes();
+      const questionsResponse = await socraticService.fetchQuestions();
+
+      if (nodesResponse.data) {
+        setNodes(nodesResponse.data);
+      }
+      if (questionsResponse.data) {
+        setQuestions(questionsResponse.data);
+      }
     };
     loadData();
   }, []);
 
   const runAnalysis = async () => {
     if (!prompt.trim()) return;
-    
+
     setRunning(true);
     setResult(null);
 
     try {
       // Extract bracket tokens for node matching
-      const tokens = extractBracketTokens(prompt).map(t => t.toLowerCase());
+      const tokens = extractBracketTokens(prompt).map((t) => t.toLowerCase());
       const matchedNodes = new Set<string>();
       const matchedAxes = new Set<string>();
 
@@ -79,7 +93,10 @@ const LabDemo: React.FC = () => {
       if (matchedNodes.size === 0) {
         const lowered = prompt.toLowerCase();
         nodes.forEach((n) => {
-          if (lowered.includes(n.label.toLowerCase()) || lowered.includes(n.id.toLowerCase())) {
+          if (
+            lowered.includes(n.label.toLowerCase()) ||
+            lowered.includes(n.id.toLowerCase())
+          ) {
             matchedNodes.add(n.id);
             matchedAxes.add(n.axis);
           }
@@ -87,17 +104,30 @@ const LabDemo: React.FC = () => {
       }
 
       // Find related questions
-      const matchedQuestions: Array<{ id: string; text: string; axis: string }> = [];
+      const matchedQuestions: Array<{
+        id: string;
+        text: string;
+        axis: string;
+      }> = [];
       if (matchedNodes.size) {
         questions.forEach((q) => {
-          const related = (q.relatedNodes || q.related_nodes || []).map((r) => r.toLowerCase());
-          const intersects = Array.from(matchedNodes).some(m => related.includes(m.toLowerCase()));
-          if (intersects) matchedQuestions.push({ id: q.id, text: q.text, axis: q.axis });
+          const related = (q.relatedNodes || q.related_nodes || []).map((r) =>
+            r.toLowerCase()
+          );
+          const intersects = Array.from(matchedNodes).some((m) =>
+            related.includes(m.toLowerCase())
+          );
+          if (intersects)
+            matchedQuestions.push({ id: q.id, text: q.text, axis: q.axis });
         });
       }
 
       if (matchedQuestions.length === 0) {
-        matchedQuestions.push(...questions.slice(0, 2).map((q) => ({ id: q.id, text: q.text, axis: q.axis })));
+        matchedQuestions.push(
+          ...questions
+            .slice(0, 2)
+            .map((q) => ({ id: q.id, text: q.text, axis: q.axis }))
+        );
       }
 
       // Run AI analysis
@@ -106,18 +136,22 @@ const LabDemo: React.FC = () => {
         targetAxis: Array.from(matchedAxes)[0],
       });
 
-      const summary = `Análisis completado: ${matchedQuestions.length} preguntas relevantes sobre los ejes ${Array.from(matchedAxes).join(', ') || 'general'}`;
+      const summary = `Análisis completado: ${
+        matchedQuestions.length
+      } preguntas relevantes sobre los ejes ${
+        Array.from(matchedAxes).join(", ") || "general"
+      }`;
 
-      const resObj: Result = { 
-        axes: Array.from(matchedAxes), 
-        matchedNodes: Array.from(matchedNodes), 
-        questions: matchedQuestions, 
+      const resObj: Result = {
+        axes: Array.from(matchedAxes),
+        matchedNodes: Array.from(matchedNodes),
+        questions: matchedQuestions,
         summary,
         aiResponse: aiResult.analysis,
         warnings: aiResult.warnings,
         tensionLevel: aiResult.tensionLevel,
       };
-      
+
       setResult(resObj);
 
       // Add to history
@@ -125,24 +159,24 @@ const LabDemo: React.FC = () => {
 
       // Save to database
       try {
-        await saveDemoResult({ 
-          prompt, 
-          summary: resObj.summary, 
-          axes: resObj.axes, 
-          matchedNodes: resObj.matchedNodes, 
+        await labService.saveDemoResult({
+          prompt,
+          summary: resObj.summary,
+          axes: resObj.axes,
+          matchedNodes: resObj.matchedNodes,
           questions: resObj.questions,
           aiResponse: resObj.aiResponse,
         });
       } catch (e) {
-        console.warn('Demo save error', e);
+        console.warn("Demo save error", e);
       }
     } catch (e) {
-      console.error('Analysis error:', e);
+      console.error("Analysis error:", e);
       setResult({
         axes: [],
         matchedNodes: [],
         questions: [],
-        summary: 'Error al procesar el análisis.',
+        summary: "Error al procesar el análisis.",
       });
     } finally {
       setRunning(false);
@@ -151,11 +185,11 @@ const LabDemo: React.FC = () => {
 
   const handleExportHistory = () => {
     const json = exportHistory();
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `lab-history-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `lab-history-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -170,7 +204,9 @@ const LabDemo: React.FC = () => {
       {/* Main input area */}
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-philosophy text-lg text-foreground">Análisis Socrático</h3>
+          <h3 className="font-philosophy text-lg text-foreground">
+            Análisis Socrático
+          </h3>
           <Button
             variant="ghost"
             size="sm"
@@ -179,7 +215,11 @@ const LabDemo: React.FC = () => {
           >
             <History className="w-4 h-4 mr-1" />
             Historial ({history.length})
-            {showHistory ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+            {showHistory ? (
+              <ChevronUp className="w-4 h-4 ml-1" />
+            ) : (
+              <ChevronDown className="w-4 h-4 ml-1" />
+            )}
           </Button>
         </div>
 
@@ -187,17 +227,30 @@ const LabDemo: React.FC = () => {
         {showHistory && (
           <div className="mb-4 p-4 bg-background border border-border rounded-lg max-h-48 overflow-y-auto">
             {history.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">Sin historial</p>
+              <p className="text-sm text-muted-foreground italic">
+                Sin historial
+              </p>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">Análisis anteriores</span>
+                  <span className="text-xs text-muted-foreground">
+                    Análisis anteriores
+                  </span>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={handleExportHistory}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleExportHistory}
+                    >
                       <Download className="w-3 h-3 mr-1" />
                       Exportar
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={clearHistory} className="text-destructive">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearHistory}
+                      className="text-destructive"
+                    >
                       <Trash2 className="w-3 h-3 mr-1" />
                       Limpiar
                     </Button>
@@ -209,13 +262,15 @@ const LabDemo: React.FC = () => {
                     onClick={() => loadFromHistory(entry.userInput)}
                     className="w-full text-left p-2 rounded bg-card hover:bg-primary/10 transition-colors"
                   >
-                    <p className="text-sm text-foreground truncate">{entry.userInput}</p>
+                    <p className="text-sm text-foreground truncate">
+                      {entry.userInput}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(entry.timestamp).toLocaleDateString('es-ES', { 
-                        day: 'numeric', 
-                        month: 'short', 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
+                      {new Date(entry.timestamp).toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
                       })}
                     </p>
                   </button>
@@ -244,18 +299,23 @@ const LabDemo: React.FC = () => {
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              {running ? 'Analizando...' : 'Analizar'}
+              {running ? "Analizando..." : "Analizar"}
             </Button>
 
             <Button
               variant="outline"
-              onClick={() => { setPrompt(''); setResult(null); }}
+              onClick={() => {
+                setPrompt("");
+                setResult(null);
+              }}
             >
               Limpiar
             </Button>
           </div>
 
-          <div className="text-xs text-muted-foreground">{prompt.length} caracteres</div>
+          <div className="text-xs text-muted-foreground">
+            {prompt.length} caracteres
+          </div>
         </div>
       </div>
 
@@ -263,7 +323,9 @@ const LabDemo: React.FC = () => {
       {result && (
         <div className="bg-card border border-border rounded-lg p-6 animate-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-muted-foreground">Resultado del Análisis</div>
+            <div className="text-sm text-muted-foreground">
+              Resultado del Análisis
+            </div>
             {result.tensionLevel !== undefined && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Tensión:</span>
@@ -272,14 +334,14 @@ const LabDemo: React.FC = () => {
                     <div
                       key={i}
                       className={`w-1.5 h-3 rounded-sm ${
-                        i < result.tensionLevel! 
-                          ? 'bg-primary' 
-                          : 'bg-muted'
+                        i < result.tensionLevel! ? "bg-primary" : "bg-muted"
                       }`}
                     />
                   ))}
                 </div>
-                <span className="text-xs text-primary font-medium">{result.tensionLevel}/10</span>
+                <span className="text-xs text-primary font-medium">
+                  {result.tensionLevel}/10
+                </span>
               </div>
             )}
           </div>
@@ -287,10 +349,14 @@ const LabDemo: React.FC = () => {
           {/* Warnings */}
           {result.warnings && result.warnings.length > 0 && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-              <div className="text-sm font-medium text-destructive mb-1">Advertencias (Regla de Oro)</div>
+              <div className="text-sm font-medium text-destructive mb-1">
+                Advertencias (Regla de Oro)
+              </div>
               <ul className="space-y-1">
                 {result.warnings.map((warning, i) => (
-                  <li key={i} className="text-xs text-destructive/80">{warning}</li>
+                  <li key={i} className="text-xs text-destructive/80">
+                    {warning}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -307,24 +373,38 @@ const LabDemo: React.FC = () => {
 
           {/* Axes */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {result.axes.length ? result.axes.map((a) => (
-              <span key={a} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-system">
-                {a}
-              </span>
-            )) : (
+            {result.axes.length ? (
+              result.axes.map((a) => (
+                <span
+                  key={a}
+                  className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-system"
+                >
+                  {a}
+                </span>
+              ))
+            ) : (
               <span className="text-xs text-muted-foreground">Ejes: —</span>
             )}
           </div>
 
           {/* Questions */}
           <div>
-            <div className="text-sm text-muted-foreground mb-2">Preguntas Socráticas Sugeridas</div>
+            <div className="text-sm text-muted-foreground mb-2">
+              Preguntas Socráticas Sugeridas
+            </div>
             <ul className="space-y-3">
               {result.questions.map((q) => (
-                <li key={q.id} className="p-3 bg-background border border-border rounded-lg">
+                <li
+                  key={q.id}
+                  className="p-3 bg-background border border-border rounded-lg"
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm text-foreground font-medium">{q.text}</div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{q.axis}</span>
+                    <div className="text-sm text-foreground font-medium">
+                      {q.text}
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {q.axis}
+                    </span>
                   </div>
                 </li>
               ))}

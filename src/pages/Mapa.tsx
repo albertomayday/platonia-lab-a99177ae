@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import Navigation from '@/components/Navigation';
-import LagrangeMap from '@/components/LagrangeMap';
-import SocraticQuestion from '@/components/SocraticQuestion';
-import { fetchNodes, fetchSocraticQuestions } from '@/utils/dataLoader';
-import type { Node, SocraticQuestion as SocraticQuestionType } from '@/types';
+import { useState, useEffect } from "react";
+import Navigation from "@/components/Navigation";
+import LagrangeMap from "@/components/LagrangeMap";
+import SocraticQuestion from "@/components/SocraticQuestion";
+import { mapService, socraticService } from "@/services/api";
+import type { Node, SocraticQuestion as SocraticQuestionType } from "@/types";
 
 const Mapa = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -13,27 +13,31 @@ const Mapa = () => {
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
-      const [nodesData, questionsData] = await Promise.all([
-        fetchNodes(),
-        fetchSocraticQuestions(),
+      const [nodesResponse, questionsResponse] = await Promise.all([
+        mapService.fetchNodes(),
+        socraticService.fetchQuestions(),
       ]);
-      setNodes(nodesData);
-      setQuestions(questionsData);
+      if (nodesResponse.data) {
+        setNodes(nodesResponse.data);
+      }
+      if (questionsResponse.data) {
+        setQuestions(questionsResponse.data);
+      }
     };
     loadData();
   }, []);
 
   const relatedQuestions = selectedNode
-    ? questions.filter(q => 
+    ? questions.filter((q) =>
         (q.relatedNodes || q.related_nodes || []).includes(selectedNode.id)
       )
     : [];
 
   const getStateStats = () => {
     return {
-      active: nodes.filter(n => n.state === 'active').length,
-      latent: nodes.filter(n => n.state === 'latent').length,
-      saturated: nodes.filter(n => n.state === 'saturated').length,
+      active: nodes.filter((n) => n.state === "active").length,
+      latent: nodes.filter((n) => n.state === "latent").length,
+      saturated: nodes.filter((n) => n.state === "saturated").length,
       total: nodes.length,
     };
   };
@@ -43,7 +47,7 @@ const Mapa = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <main className="pt-16">
         {/* Header */}
         <section className="py-12 border-b border-border">
@@ -57,24 +61,35 @@ const Mapa = () => {
                   Mapa Lagrange
                 </h1>
                 <p className="mt-4 max-w-xl text-muted-foreground">
-                  Un sistema de conceptos en tensión. Cada nodo es un punto de equilibrio 
-                  inestable entre fuerzas opuestas. Haz clic para explorar las conexiones.
+                  Un sistema de conceptos en tensión. Cada nodo es un punto de
+                  equilibrio inestable entre fuerzas opuestas. Haz clic para
+                  explorar las conexiones.
                 </p>
               </div>
 
               {/* Stats */}
               <div className="flex items-center gap-6 font-system text-sm">
                 <div className="text-center">
-                  <span className="block text-2xl text-primary">{stats.active}</span>
+                  <span className="block text-2xl text-primary">
+                    {stats.active}
+                  </span>
                   <span className="text-xs text-muted-foreground">Activos</span>
                 </div>
                 <div className="text-center">
-                  <span className="block text-2xl text-latent">{stats.latent}</span>
-                  <span className="text-xs text-muted-foreground">Latentes</span>
+                  <span className="block text-2xl text-latent">
+                    {stats.latent}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Latentes
+                  </span>
                 </div>
                 <div className="text-center">
-                  <span className="block text-2xl text-tension">{stats.saturated}</span>
-                  <span className="text-xs text-muted-foreground">Saturados</span>
+                  <span className="block text-2xl text-tension">
+                    {stats.saturated}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Saturados
+                  </span>
                 </div>
               </div>
             </div>
@@ -88,7 +103,7 @@ const Mapa = () => {
               {/* Map */}
               <div className="lg:col-span-2">
                 <div className="bg-card border border-border rounded-lg p-4 h-[600px]">
-                  <LagrangeMap 
+                  <LagrangeMap
                     onNodeSelect={(node) => setSelectedNode(node)}
                     initialZoom={1}
                   />
@@ -99,24 +114,29 @@ const Mapa = () => {
               <div className="space-y-6">
                 {/* Legend */}
                 <div className="bg-card border border-border rounded-lg p-5">
-                  <h3 className="font-philosophy text-lg text-foreground mb-4">Leyenda</h3>
+                  <h3 className="font-philosophy text-lg text-foreground mb-4">
+                    Leyenda
+                  </h3>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <span className="w-3 h-3 rounded-full bg-primary" />
                       <span className="text-sm text-muted-foreground">
-                        <span className="text-foreground">Activo</span> — En producción dialéctica
+                        <span className="text-foreground">Activo</span> — En
+                        producción dialéctica
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="w-3 h-3 rounded-full bg-latent" />
                       <span className="text-sm text-muted-foreground">
-                        <span className="text-foreground">Latente</span> — Pendiente de activación
+                        <span className="text-foreground">Latente</span> —
+                        Pendiente de activación
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="w-3 h-3 rounded-full bg-tension" />
                       <span className="text-sm text-muted-foreground">
-                        <span className="text-foreground">Saturado</span> — Tensión máxima
+                        <span className="text-foreground">Saturado</span> —
+                        Tensión máxima
                       </span>
                     </div>
                   </div>
@@ -143,14 +163,22 @@ const Mapa = () => {
                     </p>
                     {selectedNode.tension_level !== undefined && (
                       <div className="mt-3 flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Tensión:</span>
+                        <span className="text-xs text-muted-foreground">
+                          Tensión:
+                        </span>
                         <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className="h-full bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${(selectedNode.tension_level / 10) * 100}%` }}
+                            style={{
+                              width: `${
+                                (selectedNode.tension_level / 10) * 100
+                              }%`,
+                            }}
                           />
                         </div>
-                        <span className="text-xs text-primary">{selectedNode.tension_level}/10</span>
+                        <span className="text-xs text-primary">
+                          {selectedNode.tension_level}/10
+                        </span>
                       </div>
                     )}
                   </div>
@@ -172,7 +200,8 @@ const Mapa = () => {
                 {!selectedNode && (
                   <div className="bg-card border border-dashed border-border rounded-lg p-8 text-center">
                     <p className="text-sm text-muted-foreground italic">
-                      Selecciona un nodo del mapa para explorar sus tensiones y preguntas asociadas.
+                      Selecciona un nodo del mapa para explorar sus tensiones y
+                      preguntas asociadas.
                     </p>
                   </div>
                 )}

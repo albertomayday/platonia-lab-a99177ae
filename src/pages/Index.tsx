@@ -1,43 +1,59 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, Brain, Zap, Eye } from 'lucide-react';
-import Navigation from '@/components/Navigation';
-import SocraticQuestion from '@/components/SocraticQuestion';
-import questionsData from '@/data/socraticQuestions.json';
+import { Link } from "react-router-dom";
+import { ArrowRight, Brain, Zap, Eye } from "lucide-react";
+import { useEffect, useState } from "react";
+import Navigation from "@/components/Navigation";
+import SocraticQuestion from "@/components/SocraticQuestion";
+import { socraticService } from "@/services/api";
+import type { SocraticQuestion as SocraticQuestionType } from "@/types";
 
 const Index = () => {
-  const featuredQuestions = questionsData.questions.slice(0, 3);
+  const [featuredQuestions, setFeaturedQuestions] = useState<
+    SocraticQuestionType[]
+  >([]);
+
+  useEffect(() => {
+    const loadQuestions = async () => {
+      const response = await socraticService.getRandomQuestions(3);
+      if (response.data) {
+        setFeaturedQuestions(response.data);
+      }
+    };
+    loadQuestions();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0">
-          <div 
+          <div
             className="absolute inset-0 opacity-20"
             style={{
-              background: 'radial-gradient(ellipse at 30% 40%, hsl(38 70% 50% / 0.15) 0%, transparent 50%)'
+              background:
+                "radial-gradient(ellipse at 30% 40%, hsl(38 70% 50% / 0.15) 0%, transparent 50%)",
             }}
           />
-          <div 
+          <div
             className="absolute inset-0 opacity-10"
             style={{
-              background: 'radial-gradient(ellipse at 70% 60%, hsl(220 40% 45% / 0.2) 0%, transparent 40%)'
+              background:
+                "radial-gradient(ellipse at 70% 60%, hsl(220 40% 45% / 0.2) 0%, transparent 40%)",
             }}
           />
         </div>
 
         {/* Grid overlay */}
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `
               linear-gradient(to right, hsl(38 70% 50%) 1px, transparent 1px),
               linear-gradient(to bottom, hsl(38 70% 50%) 1px, transparent 1px)
             `,
-            backgroundSize: '60px 60px'
+            backgroundSize: "60px 60px",
           }}
         />
 
@@ -56,14 +72,18 @@ const Index = () => {
 
           {/* Subtitle */}
           <p className="fade-in-up opacity-0 stagger-3 mt-6 max-w-2xl mx-auto font-philosophy text-xl md:text-2xl text-muted-foreground italic leading-relaxed">
-            Un sistema que obliga a pensar 
-            <span className="text-foreground"> incluso cuando intenta automatizar el pensamiento.</span>
+            Un sistema que obliga a pensar
+            <span className="text-foreground">
+              {" "}
+              incluso cuando intenta automatizar el pensamiento.
+            </span>
           </p>
 
           {/* Description */}
           <p className="fade-in-up opacity-0 stagger-4 mt-8 max-w-xl mx-auto text-muted-foreground leading-relaxed">
-            No es una web. No es un podcast. No es un experimento de IA.
-            Es un artefacto dialéctico que devuelve preguntas mejor formuladas que tus respuestas.
+            No es una web. No es un podcast. No es un experimento de IA. Es un
+            artefacto dialéctico que devuelve preguntas mejor formuladas que tus
+            respuestas.
           </p>
 
           {/* CTA Buttons */}
@@ -104,31 +124,52 @@ const Index = () => {
                 ¿Qué es el Sistema PlatonIA?
               </h2>
               <p className="mt-6 text-muted-foreground leading-relaxed">
-                PlatonIA es un reactor dialéctico: un sistema que cruza filosofía crítica, 
-                inteligencia artificial y tensiones conceptuales para generar pensamiento, 
-                no respuestas prefabricadas.
+                PlatonIA es un reactor dialéctico: un sistema que cruza
+                filosofía crítica, inteligencia artificial y tensiones
+                conceptuales para generar pensamiento, no respuestas
+                prefabricadas.
               </p>
               <p className="mt-4 text-muted-foreground leading-relaxed">
-                Cada nodo del mapa es un concepto en tensión. Cada pregunta socrática 
-                es una provocación estructurada. Cada episodio del podcast es una 
-                exploración de contradicciones productivas.
+                Cada nodo del mapa es un concepto en tensión. Cada pregunta
+                socrática es una provocación estructurada. Cada episodio del
+                podcast es una exploración de contradicciones productivas.
               </p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               {[
-                { icon: Brain, title: 'Crítica Activa', desc: 'No acepta respuestas, genera preguntas' },
-                { icon: Zap, title: 'Tensión Productiva', desc: 'El conflicto como método de conocimiento' },
-                { icon: Eye, title: 'Transparencia Radical', desc: 'El poder visible es poder auditable' },
-                { icon: ArrowRight, title: 'Retroalimentación', desc: 'Todo output vuelve a ser input' },
+                {
+                  icon: Brain,
+                  title: "Crítica Activa",
+                  desc: "No acepta respuestas, genera preguntas",
+                },
+                {
+                  icon: Zap,
+                  title: "Tensión Productiva",
+                  desc: "El conflicto como método de conocimiento",
+                },
+                {
+                  icon: Eye,
+                  title: "Transparencia Radical",
+                  desc: "El poder visible es poder auditable",
+                },
+                {
+                  icon: ArrowRight,
+                  title: "Retroalimentación",
+                  desc: "Todo output vuelve a ser input",
+                },
               ].map((item, i) => (
-                <div 
+                <div
                   key={i}
                   className="p-5 rounded-lg bg-background border border-border hover:border-primary/30 transition-colors group"
                 >
                   <item.icon className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
-                  <h3 className="mt-3 font-philosophy text-sm text-foreground">{item.title}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{item.desc}</p>
+                  <h3 className="mt-3 font-philosophy text-sm text-foreground">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.desc}
+                  </p>
                 </div>
               ))}
             </div>
@@ -150,10 +191,7 @@ const Index = () => {
 
           <div className="grid md:grid-cols-3 gap-6">
             {featuredQuestions.map((question) => (
-              <SocraticQuestion 
-                key={question.id} 
-                question={question as any} 
-              />
+              <SocraticQuestion key={question.id} question={question as any} />
             ))}
           </div>
 
@@ -177,12 +215,14 @@ const Index = () => {
               Advertencia
             </span>
           </div>
-          
+
           <p className="font-philosophy text-2xl md:text-3xl text-foreground leading-relaxed italic">
             "Si esto fracasa, no será por falta de técnica.
             <br />
-            <span className="text-primary">Será porque a la gente no le gusta que le devuelvan 
-            preguntas mejor formuladas que sus respuestas."</span>
+            <span className="text-primary">
+              Será porque a la gente no le gusta que le devuelvan preguntas
+              mejor formuladas que sus respuestas."
+            </span>
           </p>
 
           <div className="mt-12 pt-8 border-t border-border">
@@ -206,11 +246,26 @@ const Index = () => {
               Platon<span className="text-primary">IA</span>
             </span>
           </div>
-          
+
           <div className="flex items-center gap-6 font-system text-sm text-muted-foreground">
-            <Link to="/mapa" className="hover:text-foreground transition-colors">Mapa</Link>
-            <Link to="/podcast" className="hover:text-foreground transition-colors">Podcast</Link>
-            <Link to="/laboratorio" className="hover:text-foreground transition-colors">Laboratorio</Link>
+            <Link
+              to="/mapa"
+              className="hover:text-foreground transition-colors"
+            >
+              Mapa
+            </Link>
+            <Link
+              to="/podcast"
+              className="hover:text-foreground transition-colors"
+            >
+              Podcast
+            </Link>
+            <Link
+              to="/laboratorio"
+              className="hover:text-foreground transition-colors"
+            >
+              Laboratorio
+            </Link>
           </div>
 
           <p className="font-system text-xs text-muted-foreground">
