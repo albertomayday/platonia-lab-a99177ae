@@ -56,9 +56,18 @@ INSTRUCCIONES CRÍTICAS:
 
 Tu análisis debe revelar la complejidad del problema, no simplificarlo.`;
 
-    const messages = [
-      { role: "system", content: systemPrompt || defaultSystemPrompt },
-    ];
+    // Use provided systemPrompt (from frontend) or fallback to default
+    const effectiveSystemPrompt =
+      systemPrompt && systemPrompt.trim().length > 50
+        ? systemPrompt
+        : defaultSystemPrompt;
+
+    console.log(
+      "Using system prompt:",
+      effectiveSystemPrompt.substring(0, 100) + "..."
+    );
+
+    const messages = [{ role: "system", content: effectiveSystemPrompt }];
 
     if (context) {
       messages.push({

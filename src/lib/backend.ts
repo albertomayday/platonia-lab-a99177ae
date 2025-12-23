@@ -43,8 +43,8 @@ export async function saveDemoResult(payload: {
 /**
  * @deprecated Use labService.generateAIResponse() or useGenerateAI() hook instead
  */
-export async function generateWithOpenAI(prompt: string, context?: string) {
-  const response = await labService.generateAIResponse({ prompt, context });
+export async function generateWithOpenAI(prompt: string, context?: string, systemPrompt?: string) {
+  const response = await labService.generateAIResponse({ prompt, context, systemPrompt });
   if (response.error) {
     console.error('OpenAI function error:', response.error);
   }

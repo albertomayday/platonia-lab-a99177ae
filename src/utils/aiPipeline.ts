@@ -28,16 +28,34 @@ export async function analyzeWithAI(
   const { userInput, context, targetAxis } = request;
 
   try {
-    // Build the prompt for OpenAI
+    // Build dynamic system prompt based on target axis
     const systemPrompt = buildSystemPrompt(targetAxis);
-    const fullPrompt = context
-      ? `Contexto: ${context}\n\nInput del usuario: ${userInput}`
-      : userInput;
 
-    // Call the OpenAI edge function via backend entry-point
+    // Build rich context from graph including related nodes
+    const graphContext = await buildContextFromGraph();
+    const relatedNodesPreview = await findRelatedNodes(userInput, "");
+    const nodesContext =
+      relatedNodesPreview.length > 0
+        ? `\n\nNodos relacionados identificados: ${relatedNodesPreview.join(
+            ", "
+          )}`
+        : "";
+
+    // Build full context with axis information
+    const axisContext = targetAxis ? `\n\nEje objetivo: ${targetAxis}` : "";
+    const fullContext = `${graphContext}${nodesContext}${axisContext}${
+      context ? `\n\nContexto adicional: ${context}` : ""
+    }`;
+
+    // Add timestamp for variability (prevent caching)
+    const timestamp = new Date().toISOString();
+    const fullPrompt = `[Timestamp: ${timestamp}]\n\n${userInput}`;
+
+    // Call the OpenAI edge function with dynamic system prompt
     const aiResp = await generateWithOpenAI(
       fullPrompt,
-      await buildContextFromGraph()
+      fullContext,
+      systemPrompt
     );
     if (aiResp.error) {
       console.error("AI analysis error:", aiResp.error);
@@ -84,7 +102,15 @@ export async function analyzeWithAI(
  * Build system prompt based on target axis
  */
 function buildSystemPrompt(targetAxis?: string): string {
-  const basePrompt = `Eres un filósofo socrático especializado en análisis dialéctico profundo del Sistema Lagrange. 
+  const axisDescriptions: Record<string, string> = {
+    L1: "L1 (Miedo): Ontología de la amenaza. Explora cómo el miedo estructura la experiencia, genera narrativas de supervivencia y establece límites entre lo seguro y lo peligroso.",
+    L2: "L2 (Control): Poder y gestión. Examina las dinámicas de control, dominación, resistencia y los mecanismos que naturalizan relaciones de poder asimétricas.",
+    L3: "L3 (Legitimidad): Narrativas y verdad. Analiza cómo se construyen las narrativas legitimadoras, qué cuenta como verdad, y quién tiene autoridad epistémica.",
+    L4: 'L4 (Salud Mental): Normalización y desviación. Investiga los límites entre normalidad y patología, y cómo se construyen socialmente los estados mentales "aceptables".',
+    L5: "L5 (Responsabilidad): Agencia y determinación. Explora la tensión entre libre albedrío y determinismo, y cómo se asigna responsabilidad moral y política.",
+  };
+
+  const basePrompt = `Eres un filósofo socrático especializado en análisis dialéctico profundo del Sistema Lagrange.
 
 Tu tarea es realizar análisis filosóficos rigurosos que:
 
@@ -96,7 +122,7 @@ Tu tarea es realizar análisis filosóficos rigurosos que:
 
 4. MANTENGAN APERTURA: No resuelvas la tensión. Mantenla abierta como espacio de pensamiento crítico.
 
-5. CONTEXTO LAGRANGIANO: Analiza en términos de los cinco ejes de tensión:
+5. CONTEXTO LAGRANGIANO - Los cinco ejes de tensión:
    - L1: Miedo (ontología de la amenaza)
    - L2: Control (poder y gestión)
    - L3: Legitimidad (narrativas y verdad)
@@ -116,7 +142,9 @@ FORMATO ESPERADO:
 - 2-3 preguntas socráticas que profundicen el análisis`;
 
   if (targetAxis) {
-    return `${basePrompt}\n\nFOCO ESPECÍFICO: Enfócate en el eje "${targetAxis}" y sus tensiones dialécticas con los otros ejes del sistema.`;
+    const axisKey = targetAxis.toUpperCase();
+    const axisDetail = axisDescriptions[axisKey] || `Eje ${targetAxis}`;
+    return `${basePrompt}\n\n🎯 FOCO ESPECÍFICO: ${axisDetail}\n\nAnaliza el input desde este eje, pero sin olvidar las tensiones con los otros ejes del sistema. Identifica cómo este eje específico ilumina aspectos ocultos del problema.`;
   }
 
   return basePrompt;
