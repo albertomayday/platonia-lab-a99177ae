@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import LabDemo from '@/components/LabDemo';
 import { useAuth } from '@/hooks/useAuth';
-import { Beaker, Lock, Sparkles, AlertTriangle, LogOut, Loader2 } from 'lucide-react';
+import { Beaker, Lock, Sparkles, AlertTriangle, LogOut, Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import FileUploader from '@/components/FileUploader';
 
 const Laboratorio = () => {
   const [prompt, setPrompt] = useState('');
@@ -107,6 +108,20 @@ const Laboratorio = () => {
                 </p>
 
                 <LabDemo />
+              </div>
+
+              {/* File Upload (backend entry-point) */}
+              <div className="bg-card border border-border rounded-lg p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <UploadCloud className="w-4 h-4 text-primary" />
+                  <h3 className="font-philosophy text-lg text-foreground">
+                    Subida de Archivos
+                  </h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Prueba el flujo end-to-end del backend con la función de subida.
+                </p>
+                <FileUploader />
               </div>
 
               {/* Analysis Capabilities */}

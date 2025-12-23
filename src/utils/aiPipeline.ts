@@ -3,7 +3,7 @@
  * Functions for socratic analysis using AI
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { generateWithOpenAI } from '@/lib/backend';
 import type { AnalysisRequest, AnalysisResponse, Node, SocraticQuestion } from '@/types';
 import { fetchNodes, fetchSocraticQuestions } from './dataLoader';
 
@@ -27,22 +27,15 @@ export async function analyzeWithAI(request: AnalysisRequest): Promise<AnalysisR
       ? `Contexto: ${context}\n\nInput del usuario: ${userInput}`
       : userInput;
 
-    // Call the OpenAI edge function
-    const { data, error } = await supabase.functions.invoke('openai-chat', {
-      body: {
-        prompt: fullPrompt,
-        systemPrompt,
-        context: await buildContextFromGraph(),
-      },
-    });
-
-    if (error) {
-      console.error('AI analysis error:', error);
+    // Call the OpenAI edge function via backend entry-point
+    const aiResp = await generateWithOpenAI(fullPrompt, await buildContextFromGraph());
+    if (aiResp.error) {
+      console.error('AI analysis error:', aiResp.error);
       return generateMockResponse(userInput);
     }
 
     // Parse and structure the response
-    const aiText = data?.text || data?.generatedText || '';
+    const aiText = aiResp.text || '';
     
     // Extract related nodes based on content analysis
     const relatedNodes = await findRelatedNodes(userInput, aiText);

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://elqkotladaconqso.github.io/platonia-lab",
+  "homepage": "https://sistemaproyectomunidal.github.io/platonia-lab",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
