@@ -15,7 +15,7 @@ export class LabService extends BaseApiClient {
     summary: string;
     axes: string[];
     matchedNodes: string[];
-    questions: any[];
+    questions: Array<{ id: string; text: string; axis: string }>;
     aiResponse?: string;
   }): Promise<ApiResponse<{ id: string }>> {
     const supabase = this.getSupabaseClient();
