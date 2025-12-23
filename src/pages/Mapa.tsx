@@ -1,29 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
 import LagrangeMap from '@/components/LagrangeMap';
 import SocraticQuestion from '@/components/SocraticQuestion';
-import questionsData from '@/data/socraticQuestions.json';
-import nodesData from '@/data/nodes.json';
-
-interface Node {
-  id: string;
-  label: string;
-  axis: string;
-  description: string;
-  state: string;
-}
+import { fetchNodes, fetchSocraticQuestions } from '@/utils/dataLoader';
+import type { Node, SocraticQuestion as SocraticQuestionType } from '@/types';
 
 const Mapa = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [questions, setQuestions] = useState<SocraticQuestionType[]>([]);
+
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      const [nodesData, questionsData] = await Promise.all([
+        fetchNodes(),
+        fetchSocraticQuestions(),
+      ]);
+      setNodes(nodesData);
+      setQuestions(questionsData);
+    };
+    loadData();
+  }, []);
 
   const relatedQuestions = selectedNode
-    ? questionsData.questions.filter(q => 
-        (q.relatedNodes as string[]).includes(selectedNode.id)
+    ? questions.filter(q => 
+        (q.relatedNodes || q.related_nodes || []).includes(selectedNode.id)
       )
     : [];
 
   const getStateStats = () => {
-    const nodes = nodesData.nodes;
     return {
       active: nodes.filter(n => n.state === 'active').length,
       latent: nodes.filter(n => n.state === 'latent').length,
@@ -82,7 +88,10 @@ const Mapa = () => {
               {/* Map */}
               <div className="lg:col-span-2">
                 <div className="bg-card border border-border rounded-lg p-4 h-[600px]">
-                  <LagrangeMap onNodeSelect={(node) => setSelectedNode(node)} />
+                  <LagrangeMap 
+                    onNodeSelect={(node) => setSelectedNode(node)}
+                    initialZoom={1}
+                  />
                 </div>
               </div>
 
@@ -115,7 +124,7 @@ const Mapa = () => {
 
                 {/* Selected node details */}
                 {selectedNode && (
-                  <div className="bg-card border border-primary/30 rounded-lg p-5">
+                  <div className="bg-card border border-primary/30 rounded-lg p-5 animate-in slide-in-from-right-4 duration-300">
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="font-system text-xs text-primary uppercase">
@@ -132,12 +141,24 @@ const Mapa = () => {
                     <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
                       {selectedNode.description}
                     </p>
+                    {selectedNode.tension_level !== undefined && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Tensión:</span>
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-500"
+                            style={{ width: `${(selectedNode.tension_level / 10) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-primary">{selectedNode.tension_level}/10</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Related questions */}
                 {relatedQuestions.length > 0 && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 animate-in slide-in-from-right-4 duration-300 delay-100">
                     <h3 className="font-philosophy text-lg text-foreground">
                       Preguntas Relacionadas
                     </h3>
