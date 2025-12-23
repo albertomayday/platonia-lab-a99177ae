@@ -1,31 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navigation from "@/components/Navigation";
 import LagrangeMap from "@/components/LagrangeMap";
 import SocraticQuestion from "@/components/SocraticQuestion";
-import { mapService, socraticService } from "@/services/api";
-import type { Node, SocraticQuestion as SocraticQuestionType } from "@/types";
+import { useMapNodes, useSocraticQuestions } from "@/hooks/queries";
+import type { Node } from "@/types";
+import { Loader2 } from "lucide-react";
 
 const Mapa = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [questions, setQuestions] = useState<SocraticQuestionType[]>([]);
 
-  // Load data on mount
-  useEffect(() => {
-    const loadData = async () => {
-      const [nodesResponse, questionsResponse] = await Promise.all([
-        mapService.fetchNodes(),
-        socraticService.fetchQuestions(),
-      ]);
-      if (nodesResponse.data) {
-        setNodes(nodesResponse.data);
-      }
-      if (questionsResponse.data) {
-        setQuestions(questionsResponse.data);
-      }
-    };
-    loadData();
-  }, []);
+  const { data: nodes = [], isLoading: nodesLoading } = useMapNodes();
+  const { data: questions = [], isLoading: questionsLoading } =
+    useSocraticQuestions();
 
   const relatedQuestions = selectedNode
     ? questions.filter((q) =>
@@ -43,6 +29,7 @@ const Mapa = () => {
   };
 
   const stats = getStateStats();
+  const isLoading = nodesLoading || questionsLoading;
 
   return (
     <div className="min-h-screen bg-background">

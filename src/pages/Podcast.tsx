@@ -1,30 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navigation from "@/components/Navigation";
 import EpisodeCard from "@/components/EpisodeCard";
 import AudioPlayer from "@/components/AudioPlayer";
 import TranscriptViewer from "@/components/TranscriptViewer";
-import { podcastService } from "@/services/api";
+import { usePodcastEpisodes } from "@/hooks/queries";
 import { getTranscript } from "@/data/transcripts";
 import type { Episode } from "@/types";
-import { Headphones, Rss, X } from "lucide-react";
+import { Headphones, Rss, X, Loader2 } from "lucide-react";
 
 const Podcast = () => {
   const [selectedEpisode, setSelectedEpisode] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
 
-  useEffect(() => {
-    const loadEpisodes = async () => {
-      const response = await podcastService.fetchEpisodes();
-      if (response.data) {
-        setEpisodes(response.data.filter((e) => e.is_published));
-      }
-    };
-    loadEpisodes();
-  }, []);
+  const { data: episodes = [], isLoading, error } = usePodcastEpisodes();
+
+  const publishedEpisodes = episodes.filter((e) => e.is_published);
 
   const selectedEpisodeData = selectedEpisode
-    ? episodes.find((e) => e.id === selectedEpisode)
+    ? publishedEpisodes.find((e) => e.id === selectedEpisode)
     : null;
   const transcript = selectedEpisode ? getTranscript(selectedEpisode) : null;
 
@@ -70,7 +63,14 @@ const Podcast = () => {
                   Suscribirse
                 </button>
                 <span className="text-sm text-muted-foreground font-system">
-                  {episodes.length} episodios disponibles
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Cargando...
+                    </span>
+                  ) : (
+                    `${publishedEpisodes.length} episodios disponibles`
+                  )}
                 </span>
               </div>
             </div>
@@ -112,15 +112,25 @@ const Podcast = () => {
         {/* Episodes List */}
         <section className="py-16">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {episodes.map((episode) => (
-                <EpisodeCard
-                  key={episode.id}
-                  episode={episode as any}
-                  onPlay={() => setSelectedEpisode(episode.id)}
-                />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-20 text-muted-foreground">
+                Error al cargar episodios
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {publishedEpisodes.map((episode) => (
+                  <EpisodeCard
+                    key={episode.id}
+                    episode={episode as any}
+                    onPlay={() => setSelectedEpisode(episode.id)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>

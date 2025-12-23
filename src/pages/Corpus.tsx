@@ -1,25 +1,15 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import CorpusCard from "@/components/CorpusCard";
-import { corpusService } from "@/services/api";
-import type { CorpusEntry } from "@/types";
-import { BookOpen } from "lucide-react";
+import { useCorpusEntries } from "@/hooks/queries";
+import { BookOpen, Loader2 } from "lucide-react";
 
 const Corpus = () => {
-  const [entries, setEntries] = useState<CorpusEntry[]>([]);
-
-  useEffect(() => {
-    const loadEntries = async () => {
-      const response = await corpusService.fetchEntries({
-        status: "published",
-      });
-      if (response.data) {
-        setEntries(response.data);
-      }
-    };
-    loadEntries();
-  }, []);
+  const {
+    data: entries = [],
+    isLoading,
+    error,
+  } = useCorpusEntries({ status: "published" });
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,11 +40,25 @@ const Corpus = () => {
 
         <section className="py-16">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {entries.map((entry) => (
-                <CorpusCard key={entry.id} entry={entry} />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-20 text-muted-foreground">
+                Error al cargar entradas
+              </div>
+            ) : entries.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">
+                No hay entradas publicadas
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {entries.map((entry) => (
+                  <CorpusCard key={entry.id} entry={entry} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>

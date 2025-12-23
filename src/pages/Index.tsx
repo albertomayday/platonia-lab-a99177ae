@@ -1,25 +1,12 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Brain, Zap, Eye } from "lucide-react";
-import { useEffect, useState } from "react";
 import Navigation from "@/components/Navigation";
 import SocraticQuestion from "@/components/SocraticQuestion";
-import { socraticService } from "@/services/api";
-import type { SocraticQuestion as SocraticQuestionType } from "@/types";
+import { useRandomSocraticQuestions } from "@/hooks/queries";
 
 const Index = () => {
-  const [featuredQuestions, setFeaturedQuestions] = useState<
-    SocraticQuestionType[]
-  >([]);
-
-  useEffect(() => {
-    const loadQuestions = async () => {
-      const response = await socraticService.getRandomQuestions(3);
-      if (response.data) {
-        setFeaturedQuestions(response.data);
-      }
-    };
-    loadQuestions();
-  }, []);
+  const { data: featuredQuestions = [], isLoading } =
+    useRandomSocraticQuestions(3);
 
   return (
     <div className="min-h-screen bg-background">

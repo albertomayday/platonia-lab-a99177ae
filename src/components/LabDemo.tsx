@@ -1,8 +1,12 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState } from "react";
 import { useLabHistory } from "@/hooks/useLabHistory";
 import { analyzeWithAI } from "@/utils/aiPipeline";
-import { mapService, socraticService, labService } from "@/services/api";
-import type { Node, SocraticQuestion, AnalysisResponse } from "@/types";
+import {
+  useMapNodes,
+  useSocraticQuestions,
+  useSaveDemoResult,
+} from "@/hooks/queries";
+import type { AnalysisResponse } from "@/types";
 import {
   Sparkles,
   Loader2,
@@ -11,6 +15,7 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,26 +44,24 @@ const LabDemo: React.FC = () => {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [questions, setQuestions] = useState<SocraticQuestion[]>([]);
+
+  // Use optimized hooks
+  const {
+    data: nodes = [],
+    isLoading: nodesLoading,
+    error: nodesError,
+  } = useMapNodes();
+  const {
+    data: questions = [],
+    isLoading: questionsLoading,
+    error: questionsError,
+  } = useSocraticQuestions();
+  const { mutateAsync: saveDemoMutation } = useSaveDemoResult();
 
   const { history, addAnalysis, clearHistory, exportHistory } = useLabHistory();
 
-  // Load data on mount
-  useEffect(() => {
-    const loadData = async () => {
-      const nodesResponse = await mapService.fetchNodes();
-      const questionsResponse = await socraticService.fetchQuestions();
-
-      if (nodesResponse.data) {
-        setNodes(nodesResponse.data);
-      }
-      if (questionsResponse.data) {
-        setQuestions(questionsResponse.data);
-      }
-    };
-    loadData();
-  }, []);
+  const dataLoading = nodesLoading || questionsLoading;
+  const dataError = nodesError || questionsError;
 
   const runAnalysis = async () => {
     if (!prompt.trim()) return;
@@ -159,7 +162,7 @@ const LabDemo: React.FC = () => {
 
       // Save to database
       try {
-        await labService.saveDemoResult({
+        await saveDemoMutation({
           prompt,
           summary: resObj.summary,
           axes: resObj.axes,
@@ -201,6 +204,21 @@ const LabDemo: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* Error states */}
+      {dataError && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-destructive">
+              Error al cargar datos
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              No se pudieron cargar los nodos o preguntas desde el servidor
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main input area */}
       <div className="bg-card border border-border rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
@@ -291,15 +309,24 @@ const LabDemo: React.FC = () => {
           <div className="flex items-center gap-3">
             <Button
               onClick={runAnalysis}
-              disabled={running || prompt.trim().length === 0}
+              disabled={
+                running ||
+                prompt.trim().length === 0 ||
+                dataLoading ||
+                !!dataError
+              }
               className="gap-2"
             >
-              {running ? (
+              {running || dataLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              {running ? "Analizando..." : "Analizar"}
+              {dataLoading
+                ? "Cargando datos..."
+                : running
+                ? "Analizando..."
+                : "Analizar"}
             </Button>
 
             <Button
