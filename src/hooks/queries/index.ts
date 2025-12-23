@@ -18,5 +18,8 @@ export * from './usePodcast';
 // Socratic hooks
 export * from './useSocratic';
 
+// Auth hooks
+export * from './useAuth';
+
 // File hooks
 export * from './useFiles';

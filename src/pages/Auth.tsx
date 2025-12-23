@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
+import { useSignIn, useSignUp } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { Loader2, Mail, Lock, UserPlus, LogIn } from 'lucide-react';
 
@@ -18,18 +16,12 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { signIn, signUp, user, loading } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (!loading && user) {
-      navigate('/laboratorio');
-    }
-  }, [user, loading, navigate]);
+  const signInMutation = useSignIn();
+  const signUpMutation = useSignUp();
+  
+  const isLoading = signInMutation.isPending || signUpMutation.isPending;
 
   const validateForm = () => {
     try {
@@ -53,69 +45,13 @@ const Auth = () => {
     e.preventDefault();
     
     if (!validateForm()) return;
-    
-    setIsLoading(true);
 
-    try {
-      if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast({
-              title: 'Error de autenticación',
-              description: 'Email o contraseña incorrectos',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Error',
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
-        } else {
-          toast({
-            title: '¡Bienvenido!',
-            description: 'Sesión iniciada correctamente',
-          });
-          navigate('/laboratorio');
-        }
-      } else {
-        const { error } = await signUp(email, password);
-        if (error) {
-          if (error.message.includes('User already registered')) {
-            toast({
-              title: 'Usuario existente',
-              description: 'Este email ya está registrado. Intenta iniciar sesión.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Error',
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
-        } else {
-          toast({
-            title: '¡Cuenta creada!',
-            description: 'Tu cuenta ha sido creada exitosamente',
-          });
-          navigate('/laboratorio');
-        }
-      }
-    } finally {
-      setIsLoading(false);
+    if (isLogin) {
+      signInMutation.mutate({ email, password });
+    } else {
+      signUpMutation.mutate({ email, password });
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
